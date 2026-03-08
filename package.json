@@ -1,0 +1,51 @@
+{
+  "name": "@mhrj/whatsapp-mcp",
+  "version": "1.0.0",
+  "description": "An MCP server that enables AI agents to interact with users over WhatsApp",
+  "main": "build/index.js",
+  "bin": {
+    "whatsapp-mcp": "./build/index.js"
+  },
+  "scripts": {
+    "start": "node build/index.js",
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "node --import tsx/esm --test tests/*.test.ts",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/meharajM/whatsapp-mcp.git"
+  },
+  "keywords": [
+    "mcp",
+    "model context protocol",
+    "whatsapp",
+    "ai",
+    "agent",
+    "baileys"
+  ],
+  "author": "meharajM",
+  "license": "ISC",
+  "type": "module",
+  "files": [
+    "build"
+  ],
+  "bugs": {
+    "url": "https://github.com/meharajM/whatsapp-mcp/issues"
+  },
+  "homepage": "https://github.com/meharajM/whatsapp-mcp#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@whiskeysockets/baileys": "^6.6.0",
+    "dotenv": "^17.3.1",
+    "pino": "^10.3.1",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.5",
+    "@types/qrcode-terminal": "^0.12.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

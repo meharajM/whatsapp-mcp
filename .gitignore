@@ -1,0 +1,4 @@
+node_modules
+build
+.env
+baileys_auth_info
