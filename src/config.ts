@@ -32,10 +32,19 @@ function normalizeWhatsappId(number: string): string {
 }
 
 const rawTargetNumber = requireEnv('WHATSAPP_TARGET_NUMBER');
+const rawAllowedNumbers = process.env.WHATSAPP_ALLOWED_NUMBERS;
 
 export const config = {
-    /** The WhatsApp ID of the user that the agent will talk to */
+    /** The default WhatsApp number (with @s.whatsapp.net suffix) to send messages to */
     targetNumber: normalizeWhatsappId(rawTargetNumber),
+
+    /** 
+     * Specific numbers allowed to interact with the bot.
+     * Prevents random people in a group or random DMs from controlling the agent.
+     */
+    allowedNumbers: rawAllowedNumbers
+        ? rawAllowedNumbers.split(',').map(n => normalizeWhatsappId(n.trim())).filter(Boolean)
+        : null,
 
     /** Directory where Baileys stores auth session files */
     authDir: join(mcpDir, 'baileys_auth_info'),

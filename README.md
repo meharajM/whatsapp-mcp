@@ -27,7 +27,7 @@ Add this to your MCP configuration file:
 }
 ```
 
-> **Note**: `WHATSAPP_TARGET_NUMBER` should be the phone number that will receive messages, in international format without the `+` sign. Adding `@s.whatsapp.net` at the end is recommended but the server will auto-append it if missing.
+> **Note about Allowed Numbers**: `WHATSAPP_TARGET_NUMBER` is the *default* recipient for all messages. However, if your target is a Whatsapp Group, any member of the group would be able to answer the AI by default. To restrict replies *only* to specific numbers (to prevent unauthorized people from answering), you can optionally add a comma-separated list of numbers as an environment variable: `"WHATSAPP_ALLOWED_NUMBERS": "123@s.whatsapp.net,456@s.whatsapp.net"`. If set, the AI will ONLY honor responses from these specific matching users.
 
 > **Troubleshooting `npx: executable file not found in $PATH` or `env: node: No such file or directory`**: 
 > If your IDE/Agent complains it cannot find `npx` or `node`, it's because GUI apps (like Cursor) don't inherit your terminal's `$PATH`. To fix this, explicitly pass your `PATH` in the MCP `env` config.
