@@ -7,14 +7,11 @@
  * All logging goes to stderr so it never interferes with the MCP stdio protocol.
  */
 
-import { connect } from './whatsapp/client.js';
 import { createAndStartServer } from './mcp/server.js';
 
-async function main(): Promise<void> {
-    // 1. Connect to WhatsApp (prints QR to stderr if not yet authenticated)
-    await connect();
-
-    // 2. Start the MCP server (listens on stdin/stdout for agent requests)
+async function main() {
+    // Start the MCP server (listens on stdin/stdout for agent requests)
+    // The WhatsApp connection itself is now established explicitly using the `connect` tool.
     await createAndStartServer();
 }
 

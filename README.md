@@ -40,15 +40,17 @@ Add this to your MCP configuration file:
 
 ### Authentication (First time only)
 
-The very first time the MCP server launches, it needs to authenticate with WhatsApp Web:
+The very first time you use the MCP server, it needs to authenticate with WhatsApp Web:
 
-1. Look at your agent's MCP logs (in Cursor, look at the MCP tool output or Output window).
-2. The server will print a QR code to standard error.
+1. Call the **`connect`** tool via your Agent.
+2. The agent will return a QR code image inline in the UI. 
 3. Open WhatsApp on your phone -> Linked Devices -> Link a Device, and scan the QR.
 4. The authentication session is saved to your home directory (`~/.whatsapp-mcp/baileys_auth_info`), so you don't need to scan it again across restarts.
 
 ## Features & Tools
 
+- **`connect`**: Connects to the WhatsApp network. If not logged in, generates a QR code image base64 directly into the MCP client UI for easy scanning.
+- **`disconnect`**: Completely logs out of WhatsApp and invalidates the session credentials.
 - **`send_message`**: Sends a one-way notification. Supports optional WhatsApp markdown mapping (`*bold*`).
 - **`ask_question`**: Sends a prompt and blocks execution until a reply is received (with a timeout). Concurrent questions are smartly queued and tagged with references.
 - **`get_status`**: Provides agent connection state monitoring.

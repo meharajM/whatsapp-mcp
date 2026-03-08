@@ -14,7 +14,8 @@ import makeWASocketImport, {
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
-import qrcode from 'qrcode-terminal';
+import QRCode from 'qrcode';
+import qrcodeTerminal from 'qrcode-terminal';
 import { config } from '../config.js';
 import { resolveNext } from '../utils/question-queue.js';
 
@@ -75,88 +76,139 @@ export function isConnected(): boolean {
     return _connected;
 }
 
-/**
- * Opens (or re-opens) the WhatsApp Web connection.
- * Called once at startup and automatically on non-logout disconnects.
- */
-export async function connect(): Promise<void> {
-    const { state, saveCreds } = await useMultiFileAuthState(config.authDir);
+// ── Connection lifecycle ─────────────────────────────────────────────────────
 
-    sock = makeWASocket({
-        auth: state,
-        // QR is printed manually to stderr below; we don't want Baileys to print to stdout
-        printQRInTerminal: false,
-        logger,
-        browser: ['WhatsApp MCP', 'Chrome', '1.0.0'],
-    });
+let connectionPromise: Promise<{ status: 'connected' | 'qr'; qrDataUri?: string }> | null = null;
 
-    // ── Connection state updates ─────────────────────────────────────────────
-    sock.ev.on('connection.update', (update: any) => {
-        const { connection, lastDisconnect, qr } = update;
+export async function connect(): Promise<{ status: 'connected' | 'qr'; qrDataUri?: string }> {
+    if (_connected && sock) {
+        return { status: 'connected' };
+    }
 
-        if (qr) {
-            // QR goes to stderr so it never interferes with the MCP stdio protocol
-            qrcode.generate(qr, { small: true }, (code: string) => {
-                console.error('\n=== WhatsApp MCP: Scan QR to link your device ===');
-                console.error(code);
-                console.error('=================================================\n');
+    // Prevent starting concurrent connection attempts
+    if (connectionPromise) return connectionPromise;
+
+    connectionPromise = new Promise(async (resolve, reject) => {
+        try {
+            const { state, saveCreds } = await useMultiFileAuthState(config.authDir);
+
+            sock = makeWASocket({
+                auth: state,
+                logger,
+                printQRInTerminal: false, // We handle it manually
+                browser: ['WhatsApp MCP', 'Chrome', '1.0.0'],
             });
-        }
 
-        if (connection === 'close') {
-            _connected = false;
-            const reason = (lastDisconnect?.error as Boom)?.output?.statusCode;
-            const shouldReconnect = reason !== DisconnectReason.loggedOut;
-            console.error(
-                `[WA] Connection closed (reason: ${reason}). Reconnecting: ${shouldReconnect}`,
-            );
-            if (shouldReconnect) connect();
-        } else if (connection === 'open') {
-            _connected = true;
-            console.error('[WA] Connected to WhatsApp.');
+            // ── Connection state updates ─────────────────────────────────────────────
+            sock.ev.on('connection.update', async (update: any) => {
+                const { connection, lastDisconnect, qr } = update;
+
+                if (qr) {
+                    try {
+                        const dataUri = await QRCode.toDataURL(qr, { errorCorrectionLevel: 'L', margin: 2, scale: 6 });
+                        // Also print to stderr as a fallback reference
+                        console.error('[WhatsApp] Scan QR code or retrieve via MCP GUI.');
+                        qrcodeTerminal.generate(qr, { small: true }, (ascii) => {
+                            console.error(ascii);
+                        });
+                        resolve({ status: 'qr', qrDataUri: dataUri });
+                    } catch (err) {
+                        reject(new Error(`Failed to generate QR data URI: ${err}`));
+                    }
+                }
+
+                if (connection === 'close') {
+                    const shouldReconnect =
+                        (lastDisconnect?.error as any)?.output?.statusCode !== DisconnectReason.loggedOut;
+
+                    console.error('[WhatsApp] Connection closed.', {
+                        code: (lastDisconnect?.error as any)?.output?.statusCode,
+                        reconnect: shouldReconnect,
+                    });
+
+                    _connected = false;
+
+                    if (shouldReconnect) {
+                        // Clear the active promise so reconnect builds a new one if requested
+                        connectionPromise = null;
+                        await connect().catch(() => { });
+                    } else {
+                        // User logged out or fatal error
+                        connectionPromise = null;
+                        sock = null;
+                        reject(new Error('WhatsApp connection was logged out explicitly.'));
+                    }
+                }
+
+                if (connection === 'open') {
+                    console.error('[WhatsApp] Connected structure mapped and active.');
+                    _connected = true;
+                    resolve({ status: 'connected' });
+                }
+            });
+
+            sock.ev.on('creds.update', saveCreds);
+
+            sock.ev.on('messages.upsert', async (m: any) => {
+                if (m.type !== 'notify') return;
+
+                for (const msg of m.messages) {
+                    const remoteJid = msg.key.remoteJid;
+                    const fromMe = msg.key.fromMe;
+                    if (fromMe || !remoteJid) continue;
+                    if (remoteJid !== config.targetNumber) continue;
+
+                    const text =
+                        msg.message?.conversation ||
+                        msg.message?.extendedTextMessage?.text ||
+                        '';
+
+                    if (text) {
+                        const didResolve = resolveNext(text);
+                        if (didResolve) {
+                            console.error('[Tool:ask_question] Pending question resolved via incoming message.');
+                        }
+                    }
+                }
+            });
+
+            sock.ev.on('message-receipt.update', (updates: any[]) => {
+                for (const update of updates) {
+                    const msgId = update.key?.id;
+                    if (!msgId) continue;
+
+                    const waiter = receiptWaiters.get(msgId);
+                    if (waiter) {
+                        receiptWaiters.delete(msgId);
+                        waiter.resolve(true);
+                    }
+                }
+            });
+
+        } catch (err) {
+            connectionPromise = null;
+            reject(err);
         }
     });
 
-    // ── Persist credentials ──────────────────────────────────────────────────
-    sock.ev.on('creds.update', saveCreds);
-
-    // ── Incoming messages → resolve pending questions ────────────────────────
-    sock.ev.on('messages.upsert', async (m: any) => {
-        if (m.type !== 'notify') return;
-
-        for (const msg of m.messages) {
-            // Only process messages from the configured target number, not our own
-            if (msg.key.fromMe) continue;
-            if (msg.key.remoteJid !== config.targetNumber) continue;
-
-            const text =
-                msg.message?.conversation ??
-                msg.message?.extendedTextMessage?.text;
-
-            if (!text) continue;
-
-            const resolved = resolveNext(text);
-            if (!resolved) {
-                console.error(
-                    `[WA] Received message with no waiting question: "${text}"`,
-                );
-            }
-        }
+    // When the promise finishes successfully or throws, optionally we could clear `connectionPromise`,
+    // but caching it until a disconnect is generally safer so concurrent calls return the same status.
+    return connectionPromise.catch(err => {
+        connectionPromise = null;
+        throw err;
     });
+}
 
-    // ── Delivery receipts → unblock waitForDelivery ──────────────────────────
-    sock.ev.on('message-receipt.update', (updates: any[]) => {
-        for (const update of updates) {
-            const msgId = update.key?.id;
-            if (!msgId) continue;
-
-            const waiter = receiptWaiters.get(msgId);
-            if (waiter) {
-                receiptWaiters.delete(msgId);
-                waiter.resolve(true);
-            }
-        }
-    });
+/** 
+ * Disconnects the active socket and logs out of WhatsApp Web (invalidating the session credentials). 
+ */
+export async function disconnect(): Promise<void> {
+    if (sock) {
+        await sock.logout('Explicit disconnect via MCP tool');
+        sock = null;
+    }
+    _connected = false;
+    connectionPromise = null;
 }
 
 // ── Test helpers (never call in production code) ─────────────────────────────

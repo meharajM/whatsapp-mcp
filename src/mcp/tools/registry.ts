@@ -16,14 +16,21 @@ import {
 import { sendMessageTool, handleSendMessage } from './send-message.js';
 import { askQuestionTool, handleAskQuestion } from './ask-question.js';
 import { getStatusTool, handleGetStatus } from './get-status.js';
+import { connectTool, handleConnect } from './connect.js';
+import { disconnectTool, handleDisconnect } from './disconnect.js';
 
-/** All tools exposed by this MCP server */
-const TOOLS = [sendMessageTool, askQuestionTool, getStatusTool];
+export const ALL_TOOLS = [
+    connectTool,
+    disconnectTool,
+    sendMessageTool,
+    askQuestionTool,
+    getStatusTool,
+];
 
 export function registerTools(server: Server): void {
     // ListTools — advertise available tools to the agent
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-        tools: TOOLS,
+        tools: ALL_TOOLS,
     }));
 
     // CallTool — dispatch to the correct handler
@@ -34,13 +41,17 @@ export function registerTools(server: Server): void {
             case 'send_message':
                 return handleSendMessage(args as Record<string, unknown>);
             case 'ask_question':
-                return handleAskQuestion(args as Record<string, unknown>);
+                return await handleAskQuestion(args);
             case 'get_status':
-                return handleGetStatus();
+                return await handleGetStatus();
+            case 'connect':
+                return await handleConnect();
+            case 'disconnect':
+                return await handleDisconnect();
             default:
                 throw new McpError(
                     ErrorCode.MethodNotFound,
-                    `Unknown tool: "${name}". Available tools: ${TOOLS.map((t) => t.name).join(', ')}.`,
+                    `Unknown tool: "${name}". Available tools: ${ALL_TOOLS.map((t) => t.name).join(', ')}.`,
                 );
         }
     });
