@@ -11,9 +11,17 @@ try {
 }
 
 // Support loading `.env` from ~/.whatsapp-mcp/.env 
+const _originalLog = console.log;
+const _originalInfo = console.info;
+console.log = console.error;
+console.info = console.error;
+
 dotenv.config({ path: join(mcpDir, '.env') });
 // Also fallback to the current working directory `.env` or MCP injected environments
 dotenv.config();
+
+console.log = _originalLog;
+console.info = _originalInfo;
 
 function requireEnv(key: string): string {
     const val = process.env[key];
