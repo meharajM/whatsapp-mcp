@@ -29,8 +29,14 @@ Add this to your MCP configuration file:
 
 > **Note**: `WHATSAPP_TARGET_NUMBER` should be the phone number that will receive messages, in international format without the `+` sign. Adding `@s.whatsapp.net` at the end is recommended but the server will auto-append it if missing.
 
-> **Troubleshooting `npx: executable file not found in $PATH`**: 
-> If your IDE/Agent complains it cannot find `npx`, it's because GUI apps don't always inherit your terminal's `$PATH`. Replace `"command": "npx"` with the absolute path to your npx executable (e.g., `"/opt/homebrew/bin/npx"` on macOS or `"C:\\Program Files\\nodejs\\npx.cmd"` on Windows). You can find it by running `which npx` in your terminal.
+> **Troubleshooting `npx: executable file not found in $PATH` or `env: node: No such file or directory`**: 
+> If your IDE/Agent complains it cannot find `npx` or `node`, it's because GUI apps (like Cursor) don't inherit your terminal's `$PATH`. To fix this, explicitly pass your `PATH` in the MCP `env` config.
+> ```json
+>       "env": {
+>         "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+>         "WHATSAPP_TARGET_NUMBER": "1234567890@s.whatsapp.net"
+>       }
+> ```
 
 ### Authentication (First time only)
 
