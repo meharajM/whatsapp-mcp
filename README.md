@@ -29,6 +29,9 @@ Add this to your MCP configuration file:
 
 > **Note**: `WHATSAPP_TARGET_NUMBER` should be the phone number that will receive messages, in international format without the `+` sign. Adding `@s.whatsapp.net` at the end is recommended but the server will auto-append it if missing.
 
+> **Troubleshooting `npx: executable file not found in $PATH`**: 
+> If your IDE/Agent complains it cannot find `npx`, it's because GUI apps don't always inherit your terminal's `$PATH`. Replace `"command": "npx"` with the absolute path to your npx executable (e.g., `"/opt/homebrew/bin/npx"` on macOS or `"C:\\Program Files\\nodejs\\npx.cmd"` on Windows). You can find it by running `which npx` in your terminal.
+
 ### Authentication (First time only)
 
 The very first time the MCP server launches, it needs to authenticate with WhatsApp Web:
