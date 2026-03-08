@@ -20,7 +20,8 @@ Add this to your MCP configuration file:
         "@mhrj/whatsapp-mcp"
       ],
       "env": {
-        "WHATSAPP_TARGET_NUMBER": "1234567890@s.whatsapp.net"
+        "WHATSAPP_TARGET_NUMBER": "1234567890@s.whatsapp.net",
+        "WHATSAPP_ALLOWED_NUMBERS": "1234567890@s.whatsapp.net,0987654321@s.whatsapp.net"
       }
     }
   }

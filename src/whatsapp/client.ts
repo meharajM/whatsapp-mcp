@@ -159,14 +159,14 @@ export async function connect(): Promise<{ status: 'connected' | 'qr'; qrDataUri
 
                     if (fromMe || !remoteJid) continue;
 
+                    // Always constrain processing to the configured active chat group/number
+                    if (remoteJid !== config.targetNumber) continue;
+
                     const senderJid = participant || remoteJid;
 
                     // If explicit allowed numbers are provided, only honor messages from those specific senders
                     if (config.allowedNumbers && config.allowedNumbers.length > 0) {
                         if (!config.allowedNumbers.includes(senderJid)) continue;
-                    } else {
-                        // Default behavior: only honor messages from the target chat
-                        if (remoteJid !== config.targetNumber) continue;
                     }
 
                     const text =
