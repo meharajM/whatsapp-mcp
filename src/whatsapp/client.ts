@@ -134,21 +134,16 @@ export async function connect(): Promise<{ status: 'connected' | 'qr'; qrDataUri
                         if (existsSync(config.authDir)) {
                             try {
                                 rmSync(config.authDir, { recursive: true, force: true });
-                                console.error('[WhatsApp] Cleared stale auth session. A new QR will be generated on next connect.');
+                                console.error('[WhatsApp] Cleared stale auth session.');
                             } catch (e) {
                                 console.error('[WhatsApp] Failed to clear auth dir:', e);
                             }
                         }
                         // Resolve with a qr status so the `connect` tool retries and shows a new QR
-                        // by re-calling connect() which will start fresh
-                        const freshResult = await connect().catch((err) => {
-                            reject(err);
-                            return null;
-                        });
-                        if (freshResult) resolve(freshResult);
+                        connect().then(resolve).catch(reject);
                     } else {
                         // Transient network disconnect — reconnect silently
-                        await connect().catch(() => { });
+                        connect().then(resolve).catch(reject);
                     }
                 }
 
