@@ -12,6 +12,7 @@ import makeWASocketImport, {
     DisconnectReason,
     useMultiFileAuthState,
 } from '@whiskeysockets/baileys';
+import { rmSync, existsSync } from 'fs';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import QRCode from 'qrcode';
@@ -118,25 +119,36 @@ export async function connect(): Promise<{ status: 'connected' | 'qr'; qrDataUri
                 }
 
                 if (connection === 'close') {
-                    const shouldReconnect =
-                        (lastDisconnect?.error as any)?.output?.statusCode !== DisconnectReason.loggedOut;
+                    const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
+                    const isLoggedOut = statusCode === DisconnectReason.loggedOut;
 
-                    console.error('[WhatsApp] Connection closed.', {
-                        code: (lastDisconnect?.error as any)?.output?.statusCode,
-                        reconnect: shouldReconnect,
-                    });
+                    console.error('[WhatsApp] Connection closed.', { code: statusCode, loggedOut: isLoggedOut });
 
                     _connected = false;
+                    connectionPromise = null;
+                    sock = null;
 
-                    if (shouldReconnect) {
-                        // Clear the active promise so reconnect builds a new one if requested
-                        connectionPromise = null;
-                        await connect().catch(() => { });
+                    if (isLoggedOut) {
+                        // Stale/expired/explicitly-logged-out session.
+                        // Wipe auth files so the next connect() shows a fresh QR.
+                        if (existsSync(config.authDir)) {
+                            try {
+                                rmSync(config.authDir, { recursive: true, force: true });
+                                console.error('[WhatsApp] Cleared stale auth session. A new QR will be generated on next connect.');
+                            } catch (e) {
+                                console.error('[WhatsApp] Failed to clear auth dir:', e);
+                            }
+                        }
+                        // Resolve with a qr status so the `connect` tool retries and shows a new QR
+                        // by re-calling connect() which will start fresh
+                        const freshResult = await connect().catch((err) => {
+                            reject(err);
+                            return null;
+                        });
+                        if (freshResult) resolve(freshResult);
                     } else {
-                        // User logged out or fatal error
-                        connectionPromise = null;
-                        sock = null;
-                        reject(new Error('WhatsApp connection was logged out explicitly.'));
+                        // Transient network disconnect — reconnect silently
+                        await connect().catch(() => { });
                     }
                 }
 
