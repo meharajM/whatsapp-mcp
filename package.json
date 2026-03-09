@@ -1,6 +1,6 @@
 {
   "name": "@mhrj/whatsapp-mcp",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "An MCP server that enables AI agents to interact with users over WhatsApp",
   "main": "build/index.js",
   "bin": {
