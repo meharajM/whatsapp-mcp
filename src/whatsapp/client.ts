@@ -90,6 +90,27 @@ export async function connect(): Promise<{ status: 'connected' | 'qr'; qrDataUri
     if (connectionPromise) return connectionPromise;
 
     connectionPromise = new Promise(async (resolve, reject) => {
+        let isResolved = false;
+        const resolveSafe = (val: any) => {
+            if (isResolved) return;
+            isResolved = true;
+            resolve(val);
+        };
+        const rejectSafe = (err: any) => {
+            if (isResolved) return;
+            isResolved = true;
+            reject(err);
+        };
+
+        // If neither QR nor open happens in 20s, fail fast so the agent can retry instead of timing out MCP
+        const connectTimeout = setTimeout(() => {
+            if (!isResolved) {
+                console.error('[WhatsApp] Connection initialization timed out.');
+                connectionPromise = null;
+                rejectSafe(new Error('WhatsApp connection timed out before QR/Open.'));
+            }
+        }, 20000);
+
         try {
             const { state, saveCreds } = await useMultiFileAuthState(config.authDir);
 
@@ -110,11 +131,14 @@ export async function connect(): Promise<{ status: 'connected' | 'qr'; qrDataUri
                         // Also print to stderr as a fallback reference
                         console.error('[WhatsApp] Scan QR code or retrieve via MCP GUI.');
                         qrcodeTerminal.generate(qr, { small: true }, (ascii) => {
+                            clearTimeout(connectTimeout);
                             console.error(ascii);
                         });
-                        resolve({ status: 'qr', qrDataUri: dataUri });
+                        clearTimeout(connectTimeout);
+                        resolveSafe({ status: 'qr', qrDataUri: dataUri });
                     } catch (err) {
-                        reject(new Error(`Failed to generate QR data URI: ${err}`));
+                        clearTimeout(connectTimeout);
+                        rejectSafe(new Error(`Failed to generate QR data URI: ${err}`));
                     }
                 }
 
@@ -140,17 +164,18 @@ export async function connect(): Promise<{ status: 'connected' | 'qr'; qrDataUri
                             }
                         }
                         // Resolve with a qr status so the `connect` tool retries and shows a new QR
-                        connect().then(resolve).catch(reject);
+                        connect().then(resolveSafe).catch(rejectSafe);
                     } else {
                         // Transient network disconnect — reconnect silently
-                        connect().then(resolve).catch(reject);
+                        connect().then(resolveSafe).catch(rejectSafe);
                     }
                 }
 
                 if (connection === 'open') {
                     console.error('[WhatsApp] Connected structure mapped and active.');
                     _connected = true;
-                    resolve({ status: 'connected' });
+                    clearTimeout(connectTimeout);
+                    resolveSafe({ status: 'connected' });
                 }
             });
 
@@ -205,7 +230,7 @@ export async function connect(): Promise<{ status: 'connected' | 'qr'; qrDataUri
 
         } catch (err) {
             connectionPromise = null;
-            reject(err);
+            rejectSafe(err);
         }
     });
 

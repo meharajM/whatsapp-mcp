@@ -44,7 +44,7 @@ export async function handleConnect() {
             try {
                 writeFileSync(qrHtmlPath, htmlContent, 'utf-8');
                 // Open the file in the default web browser seamlessly!
-                await open(qrHtmlPath);
+                open(qrHtmlPath).catch(e => console.error("Could not write or open QR html:", e));
             } catch (fsErr) {
                 console.error("Could not write or open QR html:", fsErr);
             }
