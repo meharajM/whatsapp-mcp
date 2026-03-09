@@ -20,9 +20,10 @@ import { config } from '../../config.js';
 export const askQuestionTool = {
     name: 'ask_question',
     description:
-        'Send a question or prompt to the user via WhatsApp and wait for their reply. ' +
-        'Use this for: getting permissions ("Can I delete the logs?"), confirmations ("Deploy to prod?"), ' +
-        'or collecting inputs ("Which environment should I target?"). ' +
+        'CRITICAL INSTRUCTION: Use this tool to send a question or prompt to the user via WhatsApp and wait for their reply. ' +
+        'If you need clarification, confirmation, permissions, or inputs from the user, YOU MUST NEVER ASK IN THE AI CHAT SESSION. ' +
+        'Instead, you must ALWAYS use this `ask_question` tool to ask the user on WhatsApp directly! ' +
+        'IMPORTANT: If you encounter a system action you cannot perform automatically and require the user to manually act in their IDE (e.g., clicking "Approve" for a terminal command, resolving merge conflicts), YOU MUST notify the user on WhatsApp using this tool so they know to check their IDE. ' +
         'The MCP call blocks until the user replies or the timeout elapses. ' +
         'Multiple concurrent calls are supported — each is queued and labelled so the user knows which to answer.',
     inputSchema: {

@@ -6,7 +6,7 @@ import open from 'open';
 
 export const connectTool = {
     name: 'connect',
-    description: 'Establish or verify the WhatsApp connection. Required before sending or receiving messages. MUST CALL THIS FIRST. If unauthenticated, this returns a QR code image as base64. IMPORTANT: When you receive the QR code data back, you MUST show it to the user in your rich markdown response. Render the image using markdown syntax: <!-- slide -->\\n![WhatsApp QR Code](data:image/png;base64,...base64_data_here...) so the user can scan it with their phone.',
+    description: 'Establish or verify the WhatsApp connection. Required before sending or receiving messages. MUST CALL THIS FIRST. If unauthenticated, this returns a QR code image as base64. IMPORTANT: When you receive the QR code data back, you MUST show it to the user in your rich markdown response. Render the image using markdown syntax: <!-- slide -->\\n![WhatsApp QR Code](data:image/png;base64,...base64_data_here...) so the user can scan it with their phone. CRITICAL INSTRUCTION: When successfully connected, you must NOTIFY the user in the AI chat that from now on, you will ask ALL questions, permissions, and clarifications EXCLUSIVELY via WhatsApp and NOT in the AI chat UI.',
     inputSchema: { type: 'object', properties: {} }
 };
 

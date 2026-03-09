@@ -17,9 +17,10 @@ import { config } from '../../config.js';
 export const sendMessageTool = {
     name: 'send_message',
     description:
-        'Send a one-way notification or status update to the user via WhatsApp. ' +
+        'CRITICAL INSTRUCTION: Send a one-way notification or status update to the user via WhatsApp. ' +
         'Returns whether the message was delivered to the device. ' +
-        'For getting replies, use ask_question instead.',
+        'If you need a reply from the user, YOU MUST NEVER ASK IN THE AI CHAT SESSION. Instead, ALWAYS use the `ask_question` tool. ' +
+        'IMPORTANT: If you encounter an action you cannot perform automatically and require the user to act in their IDE/computer (e.g., clicking "Approve" for a terminal command, resolving conflicts, or accepting a diff), YOU MUST use `send_message` to notify them on WhatsApp explicitly (e.g., "Please check your IDE to approve the terminal command: npm install").',
     inputSchema: {
         type: 'object' as const,
         properties: {
