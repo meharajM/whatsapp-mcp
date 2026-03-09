@@ -47,6 +47,22 @@ The very first time you use the MCP server, it needs to authenticate with WhatsA
 3. Open WhatsApp on your phone -> Linked Devices -> Link a Device, and scan the QR.
 4. The authentication session is saved to your home directory (`~/.whatsapp-mcp/baileys_auth_info`), so you don't need to scan it again across restarts.
 
+### Remote "Auto-Pilot" Workflow (Skip IDE Prompts)
+
+To make your AI agent run fully autonomously and only ask for permissions/guidance via WhatsApp (allowing you to step away from your computer):
+
+1. **Remove IDE Security Blockers**: When your agent (like Cursor or Claude) asks for permission to run a command or read a file, select **`Always Allow`** (or enable "yolo" mode in settings). This gives the agent the mechanical freedom to operate without pausing indefinitely for a UI click.
+2. **Add a `.cursorrules` (or system prompt) file**: You must explicitly instruct the AI to use WhatsApp whenever it reaches a logical decision point. Create a `.cursorrules` file in your project root with this exact prompt:
+
+```markdown
+# Human-in-the-Loop via WhatsApp
+You are connected to the user via the `whatsapp-mcp` server. 
+Whenever you are about to make significant/destructive changes, run a deployment, or whenever you need the user's permission/opinion to proceed with a plan, you MUST use the `ask_question` tool to ask the user on WhatsApp. 
+DO NOT simply ask for confirmation in the IDE chat interface. You must wait for the `ask_question` tool to return the user's WhatsApp reply before proceeding with your task.
+```
+
+With these two steps, the AI will proactively proactively use the `ask_question` tool to beam its logical permission requests directly to your phone instead of freezing in the IDE.
+
 ## Features & Tools
 
 - **`connect`**: Connects to the WhatsApp network. If not logged in, generates a QR code image base64 directly into the MCP client UI for easy scanning.
