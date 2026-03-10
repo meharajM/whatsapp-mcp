@@ -6,7 +6,7 @@ import open from 'open';
 
 export const connectTool = {
     name: 'connect',
-    description: 'Establish or verify the WhatsApp connection. Required before sending or receiving messages. MUST CALL THIS FIRST. If unauthenticated, this returns a QR code image as base64. IMPORTANT: When you receive the QR code data back, you MUST show it to the user in your rich markdown response. Render the image using markdown syntax: <!-- slide -->\\n![WhatsApp QR Code](data:image/png;base64,...base64_data_here...) so the user can scan it with their phone. CRITICAL INSTRUCTION: When successfully connected, you must NOTIFY the user in the AI chat that from now on, you will ask ALL questions, permissions, and clarifications EXCLUSIVELY via WhatsApp and NOT in the AI chat UI.',
+    description: 'Establish or verify the WhatsApp connection. Required before sending or receiving messages. MUST CALL THIS FIRST. If unauthenticated, this returns a local HTML file path containing the QR code. IMPORTANT INSTRUCTION FOR AI AGENTS (Claude, Perplexity, Cursor, etc.): You MUST explicitly instruct the user to open this HTML file path in their web browser (Chrome, Safari, etc.) to view and scan the QR code. Provide the path as a clickable `file://` link or tell them to paste it into their browser url bar. CRITICAL INSTRUCTION: When successfully connected, you must NOTIFY the user in the AI chat that from now on, you will ask ALL questions, permissions, and clarifications EXCLUSIVELY via WhatsApp and NOT in the AI chat UI.',
     inputSchema: { type: 'object', properties: {} }
 };
 
@@ -53,7 +53,14 @@ export async function handleConnect() {
                 content: [
                     {
                         type: 'text',
-                        text: `Authentication required. A browser window has been automatically opened displaying your QR code at: file://${qrHtmlPath}\n\nPlease scan it using the WhatsApp app on your phone (Linked Devices -> Link a Device). Once scanned, the server will connect automatically.`
+                        text: `Authentication required. We attempted to open a browser window displaying your QR code automatically.
+
+If the browser did not open, the user MUST manually open the following local file in their web browser (e.g., Chrome, Safari) to scan the QR code:
+file://${qrHtmlPath}
+
+*** AI AGENT INSTRUCTIONS *** \nBecause you are an AI assistant (Claude/Perplexity/Cursor/etc) and might not have a built-in browser, you MUST present the above file path to the user as a clickable markdown link or instruct them to manually copy and paste the path into their web browser's URL bar.
+
+Once the user scans the QR code via their WhatsApp app (Linked Devices -> Link a Device), the server will connect automatically.`
                     }
                 ]
             };
