@@ -188,41 +188,7 @@ export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connect
 
             sock.ev.on('creds.update', saveCreds);
 
-            sock.ev.on('messages.upsert', async (m: any) => {
-                if (m.type !== 'notify') return;
-
-                for (const msg of m.messages) {
-                    const remoteJid = msg.key.remoteJid;
-                    const fromMe = msg.key.fromMe;
-                    const participant = msg.key.participant; // Populated if message is from a group
-
-                    if (fromMe || !remoteJid) continue;
-
-                    // Always constrain processing to the configured active chat group/number
-                    if (remoteJid !== config.targetNumber) continue;
-
-                    const senderJid = participant || remoteJid;
-
-                    // If explicit allowed numbers are provided, only honor messages from those specific senders
-                    if (config.allowedNumbers && config.allowedNumbers.length > 0) {
-                        if (!config.allowedNumbers.includes(senderJid)) continue;
-                    }
-
-                    const text =
-                        msg.message?.conversation ||
-                        msg.message?.extendedTextMessage?.text ||
-                        '';
-
-                    if (text) {
-                        const didResolve = resolveNext(text);
-                        if (didResolve) {
-                            console.error('[Tool:ask_question] Pending question resolved via incoming message.');
-                        } else if (unsolicitedMessageHandler) {
-                            unsolicitedMessageHandler(text, senderJid);
-                        }
-                    }
-                }
-            });
+            sock.ev.on('messages.upsert', __messageUpsertHandlerForTest);
 
             sock.ev.on('message-receipt.update', (updates: any[]) => {
                 for (const update of updates) {
@@ -265,6 +231,42 @@ export async function disconnect(): Promise<void> {
 
 // ── Test helpers (never call in production code) ─────────────────────────────
 
+export const __messageUpsertHandlerForTest = async (m: any) => {
+    if (m.type !== 'notify') return;
+
+    for (const msg of m.messages) {
+        const remoteJid = msg.key.remoteJid;
+        const fromMe = msg.key.fromMe;
+        const participant = msg.key.participant; // Populated if message is from a group
+
+        if (fromMe || !remoteJid) continue;
+
+        // Always constrain processing to the configured active chat group/number
+        if (remoteJid !== config.targetNumber) continue;
+
+        const senderJid = participant || remoteJid;
+
+        // If explicit allowed numbers are provided, only honor messages from those specific senders
+        if (config.allowedNumbers && config.allowedNumbers.length > 0) {
+            if (!config.allowedNumbers.includes(senderJid)) continue;
+        }
+
+        const text =
+            msg.message?.conversation ||
+            msg.message?.extendedTextMessage?.text ||
+            '';
+
+        if (text) {
+            const didResolve = resolveNext(text);
+            if (didResolve) {
+                console.error('[Tool:ask_question] Pending question resolved via incoming message.');
+            } else if (unsolicitedMessageHandler) {
+                unsolicitedMessageHandler(text, senderJid);
+            }
+        }
+    }
+};
+
 /** Force-set connection state for unit tests */
 export function __setConnectedForTest(val: boolean): void {
     _connected = val;
@@ -273,4 +275,17 @@ export function __setConnectedForTest(val: boolean): void {
 /** Inject a mock socket for unit tests */
 export function __setSocketForTest(mockSock: any): void {
     sock = mockSock;
+}
+
+/** Trigger the messages.upsert handler directly for tests */
+export async function __triggerMessagesUpsertForTest(m: any): Promise<void> {
+    if (!sock || !sock.ev) return;
+    const upsertHandlers = (sock.ev as any)._events?.['messages.upsert'];
+    if (Array.isArray(upsertHandlers)) {
+        for (const handler of upsertHandlers) {
+            await handler(m);
+        }
+    } else if (upsertHandlers) {
+        await upsertHandlers(m);
+    }
 }
