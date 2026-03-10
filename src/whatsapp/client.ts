@@ -79,6 +79,12 @@ export function isConnected(): boolean {
 
 // ── Connection lifecycle ─────────────────────────────────────────────────────
 
+let unsolicitedMessageHandler: ((text: string, sender: string) => void) | null = null;
+
+export function setUnsolicitedMessageHandler(handler: (text: string, sender: string) => void) {
+    unsolicitedMessageHandler = handler;
+}
+
 let connectionPromise: Promise<{ status: 'connected' | 'qr' | 'connecting'; qrDataUri?: string }> | null = null;
 
 export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connecting'; qrDataUri?: string }> {
@@ -211,6 +217,8 @@ export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connect
                         const didResolve = resolveNext(text);
                         if (didResolve) {
                             console.error('[Tool:ask_question] Pending question resolved via incoming message.');
+                        } else if (unsolicitedMessageHandler) {
+                            unsolicitedMessageHandler(text, senderJid);
                         }
                     }
                 }
