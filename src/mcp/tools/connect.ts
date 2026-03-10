@@ -59,6 +59,12 @@ export async function handleConnect() {
             };
         }
 
+        if (result.status === 'connecting') {
+            return {
+                content: [{ type: 'text', text: 'WhatsApp session found. Connection is being restored in the background. This may take up to a minute. Use the `get_status` tool to verify when it is fully connected.' }]
+            };
+        }
+
         return {
             content: [{ type: 'text', text: 'WhatsApp is connected successfully and ready to use.' }]
         };

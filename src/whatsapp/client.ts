@@ -79,9 +79,9 @@ export function isConnected(): boolean {
 
 // ── Connection lifecycle ─────────────────────────────────────────────────────
 
-let connectionPromise: Promise<{ status: 'connected' | 'qr'; qrDataUri?: string }> | null = null;
+let connectionPromise: Promise<{ status: 'connected' | 'qr' | 'connecting'; qrDataUri?: string }> | null = null;
 
-export async function connect(): Promise<{ status: 'connected' | 'qr'; qrDataUri?: string }> {
+export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connecting'; qrDataUri?: string }> {
     if (_connected && sock) {
         return { status: 'connected' };
     }
@@ -102,17 +102,12 @@ export async function connect(): Promise<{ status: 'connected' | 'qr'; qrDataUri
             reject(err);
         };
 
-        // If neither QR nor open happens in 20s, fail fast so the agent can retry instead of timing out MCP
-        const connectTimeout = setTimeout(() => {
-            if (!isResolved) {
-                console.error('[WhatsApp] Connection initialization timed out.');
-                connectionPromise = null;
-                rejectSafe(new Error('WhatsApp connection timed out before QR/Open.'));
-            }
-        }, 20000);
-
         try {
             const { state, saveCreds } = await useMultiFileAuthState(config.authDir);
+
+            // If the auth folder exists and has creds, it means we are likely restoring a session.
+            // We resolve immediately so the MCP client doesn't timeout waiting for Baileys to sync (which can take 60s+).
+            const hasExistingAuth = existsSync(config.authDir) && !!state.creds?.me;
 
             sock = makeWASocket({
                 auth: state,
@@ -125,26 +120,31 @@ export async function connect(): Promise<{ status: 'connected' | 'qr'; qrDataUri
             sock.ev.on('connection.update', async (update: any) => {
                 const { connection, lastDisconnect, qr } = update;
 
+                if (connection === 'connecting' && hasExistingAuth) {
+                    console.error('[WhatsApp] Existing session found. Initializing connection in background...');
+                    resolveSafe({ status: 'connecting' });
+                }
+
                 if (qr) {
                     try {
                         const dataUri = await QRCode.toDataURL(qr, { errorCorrectionLevel: 'L', margin: 2, scale: 6 });
                         // Also print to stderr as a fallback reference
                         console.error('[WhatsApp] Scan QR code or retrieve via MCP GUI.');
                         qrcodeTerminal.generate(qr, { small: true }, (ascii) => {
-                            clearTimeout(connectTimeout);
                             console.error(ascii);
                         });
-                        clearTimeout(connectTimeout);
                         resolveSafe({ status: 'qr', qrDataUri: dataUri });
                     } catch (err) {
-                        clearTimeout(connectTimeout);
                         rejectSafe(new Error(`Failed to generate QR data URI: ${err}`));
                     }
                 }
 
                 if (connection === 'close') {
                     const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
-                    const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+                    const isLoggedOut =
+                        statusCode === DisconnectReason.loggedOut ||
+                        statusCode === 405 ||
+                        statusCode === 403;
 
                     console.error('[WhatsApp] Connection closed.', { code: statusCode, loggedOut: isLoggedOut });
 
@@ -166,15 +166,16 @@ export async function connect(): Promise<{ status: 'connected' | 'qr'; qrDataUri
                         // Resolve with a qr status so the `connect` tool retries and shows a new QR
                         connect().then(resolveSafe).catch(rejectSafe);
                     } else {
-                        // Transient network disconnect — reconnect silently
-                        connect().then(resolveSafe).catch(rejectSafe);
+                        // Transient network disconnect — reconnect silently with a backoff to prevent tight loops
+                        setTimeout(() => {
+                            connect().then(resolveSafe).catch(rejectSafe);
+                        }, 2000);
                     }
                 }
 
                 if (connection === 'open') {
                     console.error('[WhatsApp] Connected structure mapped and active.');
                     _connected = true;
-                    clearTimeout(connectTimeout);
                     resolveSafe({ status: 'connected' });
                 }
             });
