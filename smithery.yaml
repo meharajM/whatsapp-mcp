@@ -1,0 +1,15 @@
+# Smithery configuration for WhatsApp MCP Server
+# https://smithery.ai/docs/config
+
+startCommand:
+  npx:
+    package: "@mhrj/whatsapp-mcp"
+    args: []
+    # Environment variables required for the server
+    env:
+      WHATSAPP_TARGET_NUMBER:
+        description: "The default WhatsApp number to receive notifications and questions (e.g. 1234567890@s.whatsapp.net)"
+        required: true
+      WHATSAPP_ALLOWED_NUMBERS:
+        description: "Optional comma-separated list of WhatsApp JIDs allowed to reply (e.g. 123@s.whatsapp.net,456@s.whatsapp.net)"
+        required: false

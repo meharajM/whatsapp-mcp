@@ -1,10 +1,24 @@
-# WhatsApp MCP Server
+<div align="center">
+  <img src="assets/logo.png" width="160" alt="WhatsApp MCP Logo">
+  <h1>WhatsApp MCP Server</h1>
+  <p><b>Human-in-the-Loop for AI Agents via WhatsApp</b></p>
 
-This is an MCP (Model Context Protocol) server that allows AI agents to interact directly with the user via WhatsApp. This is especially useful for getting runtime confirmations, asking for permissions, or getting inputs during a long-running execution.
+  [![npm version](https://img.shields.io/npm/v/@mhrj/whatsapp-mcp.svg)](https://www.npmjs.com/package/@mhrj/whatsapp-mcp)
+  [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
+  [![MCP](https://img.shields.io/badge/MCP-Protocol-orange.svg)](https://modelcontextprotocol.io)
+  [![Smithery](https://smithery.ai/badge/@mhrj/whatsapp-mcp)](https://smithery.ai/server/@mhrj/whatsapp-mcp)
+</div>
 
-## Using with AI Agents
+<br/>
 
-Since this package is published to NPM, you can run it directly via `npx` in your cursor or claude configuration.
+This is an **MCP (Model Context Protocol)** server that enables AI agents (like Claude or Cursor) to interact directly with you via WhatsApp. It bridges the gap between your autonomous AI and your phone, allowing for runtime confirmations, permission requests, or simple status updates while you are away from your computer.
+
+---
+
+## 🚀 Quick Start (NPX)
+
+Since this package is published to NPM, you can run it directly via `npx` in your MCP configuration.
+
 
 ### Cursor / Claude Configuration
 
@@ -78,3 +92,15 @@ If you'd like to run it locally from source:
 1. Clone the repository and `npm install`
 2. `npm run build`
 3. Link via absolute path instead of `npx`.
+
+## License
+
+This project is licensed under the [ISC License](LICENSE).
+
+### Third-Party Licenses
+
+This project utilizes the following open-source libraries:
+- [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/sdk) - [MIT License](https://github.com/modelcontextprotocol/sdk/blob/main/LICENSE)
+- [@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys) - [MIT License](https://github.com/WhiskeySockets/Baileys/blob/master/LICENSE)
+- Other dependencies (express, pino, qrcode, etc.) are licensed under permissive licenses (MIT/BSD).
+

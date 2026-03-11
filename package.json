@@ -1,7 +1,8 @@
 {
   "name": "@mhrj/whatsapp-mcp",
-  "version": "1.0.18",
-  "description": "An MCP server that enables AI agents to interact with users over WhatsApp",
+  "mcpName": "whatsapp-mcp",
+  "version": "2.0.0",
+  "description": "WhatsApp MCP Server: Human-in-the-loop for AI agents via WhatsApp for confirmations, notifications, and interactive questions.",
   "main": "build/index.js",
   "bin": {
     "whatsapp-mcp": "./build/index.js"
@@ -19,13 +20,21 @@
   },
   "keywords": [
     "mcp",
+    "mcp-server",
     "model context protocol",
     "whatsapp",
     "ai",
     "agent",
+    "human-in-the-loop",
+    "llm",
+    "notification",
     "baileys"
   ],
-  "author": "meharajM",
+  "author": {
+    "name": "meharajM",
+    "url": "https://github.com/meharajM"
+  },
+  "displayName": "WhatsApp MCP Server",
   "license": "ISC",
   "type": "module",
   "files": [
