@@ -1,7 +1,7 @@
 {
   "name": "@mhrj/whatsapp-mcp",
-  "mcpName": "whatsapp-mcp",
-  "version": "2.0.0",
+  "mcpName": "io.github.meharajM/whatsapp-mcp",
+  "version": "2.0.1",
   "description": "WhatsApp MCP Server: Human-in-the-loop for AI agents via WhatsApp for confirmations, notifications, and interactive questions.",
   "main": "build/index.js",
   "bin": {

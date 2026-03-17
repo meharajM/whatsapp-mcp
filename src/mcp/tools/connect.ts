@@ -12,7 +12,20 @@ export const connectTool = {
 
 export async function handleConnect() {
     try {
-        const result = await connect();
+        // We start the connection in the background if not already started.
+        // We race it against a very short timeout so we can return a status to the MCP client quickly.
+        const timeoutPromise = new Promise<{ status: 'timeout' }>((resolve) => {
+            setTimeout(() => resolve({ status: 'timeout' }), 3000); // 3s timeout
+        });
+
+        // We call connect() which will either start a new attempt or return the existing promise.
+        const result = await Promise.race([connect(), timeoutPromise]);
+
+        if (result.status === 'timeout') {
+            return {
+                content: [{ type: 'text', text: 'WhatsApp connection is currently initializing in the background. Please wait a few moments for the QR code to be generated or for the connection to be established. You can check progress using the `get_status` tool.' }]
+            };
+        }
 
         if (result.status === 'qr' && result.qrDataUri) {
             const qrHtmlPath = join(homedir(), '.whatsapp-mcp', 'qr.html');

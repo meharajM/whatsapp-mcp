@@ -77,6 +77,11 @@ export function isConnected(): boolean {
     return _connected;
 }
 
+/** Whether a connection attempt is currently in progress */
+export function isConnecting(): boolean {
+    return !!connectionPromise;
+}
+
 // ── Connection lifecycle ─────────────────────────────────────────────────────
 
 let unsolicitedMessageHandler: ((text: string, sender: string) => void) | null = null;
@@ -133,14 +138,16 @@ export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connect
 
                 if (qr) {
                     try {
-                        const dataUri = await QRCode.toDataURL(qr, { errorCorrectionLevel: 'L', margin: 2, scale: 6 });
+                        const dataUri = await QRCode.toDataURL(qr, { errorCorrectionLevel: 'L', margin: 2, scale: 3 });
                         // Also print to stderr as a fallback reference
                         console.error('[WhatsApp] Scan QR code or retrieve via MCP GUI.');
                         qrcodeTerminal.generate(qr, { small: true }, (ascii) => {
                             console.error(ascii);
                         });
+                        console.error('[WhatsApp] Resolving connect promise with status: qr');
                         resolveSafe({ status: 'qr', qrDataUri: dataUri });
                     } catch (err) {
+                        console.error('[WhatsApp] Failed to generate QR data URI:', err);
                         rejectSafe(new Error(`Failed to generate QR data URI: ${err}`));
                     }
                 }
@@ -170,10 +177,12 @@ export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connect
                             }
                         }
                         // Resolve with a qr status so the `connect` tool retries and shows a new QR
+                        console.error('[WhatsApp] Re-calling connect() due to logout');
                         connect().then(resolveSafe).catch(rejectSafe);
                     } else {
                         // Transient network disconnect — reconnect silently with a backoff to prevent tight loops
                         setTimeout(() => {
+                            console.error('[WhatsApp] Re-calling connect() due to transient disconnect');
                             connect().then(resolveSafe).catch(rejectSafe);
                         }, 2000);
                     }
@@ -182,6 +191,7 @@ export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connect
                 if (connection === 'open') {
                     console.error('[WhatsApp] Connected structure mapped and active.');
                     _connected = true;
+                    console.error('[WhatsApp] Resolving connect promise with status: connected');
                     resolveSafe({ status: 'connected' });
                 }
             });

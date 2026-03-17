@@ -12,7 +12,7 @@ import { setUnsolicitedMessageHandler } from '../whatsapp/client.js';
 
 export async function createAndStartServer(): Promise<void> {
     const server = new Server(
-        { name: 'whatsapp-mcp', version: '2.0.0' },
+        { name: 'whatsapp-mcp', version: '2.0.1' },
         { capabilities: { tools: {}, prompts: {} } }, // Added prompts to avoid capability errors if AI tests it
     );
 
@@ -53,5 +53,5 @@ export async function createAndStartServer(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
 
-    console.error('[MCP] Server v2.0.0 running on stdio transport.');
+    console.error('[MCP] Server v2.0.1 running on stdio transport.');
 }

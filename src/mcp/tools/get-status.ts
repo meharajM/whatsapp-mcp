@@ -7,7 +7,7 @@
  * verify the server is ready before sending messages (Gap 6).
  */
 
-import { isConnected } from '../../whatsapp/client.js';
+import { isConnected, isConnecting } from '../../whatsapp/client.js';
 import { config } from '../../config.js';
 import { getQueueLength, getPendingLabels } from '../../utils/question-queue.js';
 
@@ -26,12 +26,18 @@ export const getStatusTool = {
 
 export async function handleGetStatus() {
     const connected = isConnected();
+    const connecting = isConnecting();
     const pendingCount = getQueueLength();
     const pendingLabels = getPendingLabels();
 
-    const statusMessage = connected
-        ? `WhatsApp is connected and ready.`
-        : `WhatsApp is NOT connected. Check server logs for QR code or reconnection status.`;
+    let statusMessage = '';
+    if (connected) {
+        statusMessage = 'WhatsApp is connected successfully and ready to use.';
+    } else if (connecting) {
+        statusMessage = 'WhatsApp is currently attempting to connect in the background. Check server logs for QR code or scan manually.';
+    } else {
+        statusMessage = 'WhatsApp is NOT connected. Check server logs for QR code or reconnection status.';
+    }
 
     return {
         content: [
@@ -40,6 +46,7 @@ export async function handleGetStatus() {
                 text: JSON.stringify(
                     {
                         connected,
+                        connecting,
                         targetNumber: config.targetNumber,
                         pendingQuestions: pendingCount,
                         pendingLabels,
