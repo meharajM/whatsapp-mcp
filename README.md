@@ -1,6 +1,6 @@
 <div align="center">
   <img src="assets/logo.png" width="160" alt="WhatsApp MCP Logo">
-  <h1>WhatsApp MCP Server</h1>
+  <h1>WhatsApp MCP</h1>
   <p><b>Human-in-the-Loop for AI Agents via WhatsApp</b></p>
 
   [![npm version](https://img.shields.io/npm/v/@mhrj/whatsapp-mcp.svg)](https://www.npmjs.com/package/@mhrj/whatsapp-mcp)
@@ -104,3 +104,24 @@ This project utilizes the following open-source libraries:
 - [@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys) - [MIT License](https://github.com/WhiskeySockets/Baileys/blob/master/LICENSE)
 - Other dependencies (express, pino, qrcode, etc.) are licensed under permissive licenses (MIT/BSD).
 
+
+---
+
+## Discoverability keywords
+- Human in the loop AI
+- AI approvals
+- Runtime approvals
+- Agent notifications
+- Agent approval workflow
+- Cursor WhatsApp integration
+- Claude WhatsApp integration
+- Autonomous agents
+
+## What problem does this solve?
+- AI agents often get blocked waiting for approvals/questions when you step away from the IDE.
+- WhatsApp MCP notifies you and collects confirmations from your phone so agents can continue safely.
+
+## Who it's for
+- Cursor agent / Claude Desktop users
+- Solo builders shipping agentic workflows
+- DevOps & automation teams needing runtime approvals
