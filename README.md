@@ -12,6 +12,37 @@
 <br/>
 
 This is an **MCP (Model Context Protocol)** server that enables AI agents (like Claude or Cursor) to interact directly with you via WhatsApp. It bridges the gap between your autonomous AI and your phone, allowing for runtime confirmations, permission requests, or simple status updates while you are away from your computer.
+- AI agent messaging
+- AI agent confirmations
+- Agent interrupt system
+- AI alerts
+- MCP server
+- Cursor MCP
+- Claude Desktop MCP
+- AI notifications
+
+## Perfect for
+
+- Cursor
+- Claude Desktop
+- Claude Code
+- OpenCode
+- Codex
+- Autonomous AI workflows
+
+## Example
+
+AI:
+Deploy to production?
+
+WhatsApp:
+[YES] [NO]
+
+You:
+YES
+
+Agent continues.
+
 
 ---
 
@@ -116,6 +147,9 @@ This project utilizes the following open-source libraries:
 - Cursor WhatsApp integration
 - Claude WhatsApp integration
 - Autonomous agents
+- - Cursor power users
+- Remote workers
+
 
 ## What problem does this solve?
 - AI agents often get blocked waiting for approvals/questions when you step away from the IDE.
