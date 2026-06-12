@@ -18,7 +18,8 @@ import pino from 'pino';
 import QRCode from 'qrcode';
 import qrcodeTerminal from 'qrcode-terminal';
 import { config } from '../config.js';
-import { resolveNext } from '../utils/question-queue.js';
+import { routeIncomingReply } from '../utils/question-queue.js';
+import { pushIncomingMessage } from '../utils/inbox-queue.js';
 
 // Baileys exports as default in ESM but the types use a namespace export; handle both.
 // We use `any` for the socket because the type constraint on ReturnType<typeof makeWASocket>
@@ -32,6 +33,7 @@ const logger = pino({ level: 'silent' });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let sock: any | null = null;
 let _connected = false;
+let suppressReconnectAfterLogout = false;
 
 // ── Receipt tracking ────────────────────────────────────────────────────────
 
@@ -90,10 +92,33 @@ export function setUnsolicitedMessageHandler(handler: (text: string, sender: str
     unsolicitedMessageHandler = handler;
 }
 
-let connectionPromise: Promise<{ status: 'connected' | 'qr' | 'connecting'; qrDataUri?: string }> | null = null;
+export type ConnectionResult = {
+    status: 'connected' | 'qr' | 'connecting';
+    qrDataUri?: string;
+};
 
-export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connecting'; qrDataUri?: string }> {
+export type AuthState = 'connected' | 'connecting' | 'qr_pending' | 'disconnected';
+
+let connectionPromise: Promise<ConnectionResult> | null = null;
+let lastAuthState: AuthState = 'disconnected';
+let connectOverrideForTest: ConnectionResult | null = null;
+
+export function getAuthState(): AuthState {
+    return lastAuthState;
+}
+
+export async function connect(): Promise<ConnectionResult> {
+    if (connectOverrideForTest) {
+        lastAuthState =
+            connectOverrideForTest.status === 'qr'
+                ? 'qr_pending'
+                : connectOverrideForTest.status;
+        _connected = connectOverrideForTest.status === 'connected';
+        return connectOverrideForTest;
+    }
+
     if (_connected && sock) {
+        lastAuthState = 'connected';
         return { status: 'connected' };
     }
 
@@ -133,6 +158,7 @@ export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connect
 
                 if (connection === 'connecting' && hasExistingAuth) {
                     console.error('[WhatsApp] Existing session found. Initializing connection in background...');
+                    lastAuthState = 'connecting';
                     resolveSafe({ status: 'connecting' });
                 }
 
@@ -144,6 +170,7 @@ export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connect
                         qrcodeTerminal.generate(qr, { small: true }, (ascii) => {
                             console.error(ascii);
                         });
+                        lastAuthState = 'qr_pending';
                         console.error('[WhatsApp] Resolving connect promise with status: qr');
                         resolveSafe({ status: 'qr', qrDataUri: dataUri });
                     } catch (err) {
@@ -162,8 +189,15 @@ export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connect
                     console.error('[WhatsApp] Connection closed.', { code: statusCode, loggedOut: isLoggedOut });
 
                     _connected = false;
+                    lastAuthState = 'disconnected';
                     connectionPromise = null;
                     sock = null;
+
+                    if (suppressReconnectAfterLogout) {
+                        suppressReconnectAfterLogout = false;
+                        resolveSafe({ status: 'connecting' });
+                        return;
+                    }
 
                     if (isLoggedOut) {
                         // Stale/expired/explicitly-logged-out session.
@@ -191,6 +225,7 @@ export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connect
                 if (connection === 'open') {
                     console.error('[WhatsApp] Connected structure mapped and active.');
                     _connected = true;
+                    lastAuthState = 'connected';
                     console.error('[WhatsApp] Resolving connect promise with status: connected');
                     resolveSafe({ status: 'connected' });
                 }
@@ -232,10 +267,17 @@ export async function connect(): Promise<{ status: 'connected' | 'qr' | 'connect
  */
 export async function disconnect(): Promise<void> {
     if (sock) {
-        await sock.logout('Explicit disconnect via MCP tool');
+        suppressReconnectAfterLogout = true;
+        try {
+            await sock.logout('Explicit disconnect via MCP tool');
+        } catch (err) {
+            suppressReconnectAfterLogout = false;
+            throw err;
+        }
         sock = null;
     }
     _connected = false;
+    lastAuthState = 'disconnected';
     connectionPromise = null;
 }
 
@@ -267,11 +309,16 @@ export const __messageUpsertHandlerForTest = async (m: any) => {
             '';
 
         if (text) {
-            const didResolve = resolveNext(text);
-            if (didResolve) {
+            const replyStatus = routeIncomingReply(text, remoteJid);
+            if (replyStatus === 'resolved') {
                 console.error('[Tool:ask_question] Pending question resolved via incoming message.');
-            } else if (unsolicitedMessageHandler) {
-                unsolicitedMessageHandler(text, senderJid);
+            } else if (replyStatus === 'expired') {
+                console.error('[Tool:ask_question] Ignored late reply for a timed-out question.');
+            } else if (remoteJid === config.targetNumber) {
+                pushIncomingMessage(text, senderJid);
+                if (unsolicitedMessageHandler) {
+                    unsolicitedMessageHandler(text, senderJid);
+                }
             }
         }
     }
@@ -280,11 +327,16 @@ export const __messageUpsertHandlerForTest = async (m: any) => {
 /** Force-set connection state for unit tests */
 export function __setConnectedForTest(val: boolean): void {
     _connected = val;
+    lastAuthState = val ? 'connected' : 'disconnected';
 }
 
 /** Inject a mock socket for unit tests */
 export function __setSocketForTest(mockSock: any): void {
     sock = mockSock;
+}
+
+export function __setConnectResultForTest(result: ConnectionResult | null): void {
+    connectOverrideForTest = result;
 }
 
 /** Trigger the messages.upsert handler directly for tests */

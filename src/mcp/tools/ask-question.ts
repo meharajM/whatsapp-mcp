@@ -16,6 +16,7 @@ import { getSocket, isConnected } from '../../whatsapp/client.js';
 import { enqueue } from '../../utils/question-queue.js';
 import { autoFormat, normalizeNumber } from '../../utils/formatting.js';
 import { config } from '../../config.js';
+import { ensureConnectedForAction } from './auth-flow.js';
 
 export const askQuestionTool = {
     name: 'ask_question',
@@ -53,10 +54,10 @@ export const askQuestionTool = {
 
 export async function handleAskQuestion(args: Record<string, unknown>) {
     if (!isConnected()) {
-        throw new McpError(
-            ErrorCode.InternalError,
-            'WhatsApp is not connected. Use get_status to check connection state.',
-        );
+        const authResult = await ensureConnectedForAction('ask the user a question on WhatsApp');
+        if (authResult) {
+            return authResult;
+        }
     }
 
     const question = args.question as string;
@@ -68,7 +69,7 @@ export async function handleAskQuestion(args: Record<string, unknown>) {
     const timeoutMs = ((args.timeout_minutes as number) ?? 5) * 60 * 1000;
 
     // Step 1: Enqueue first to reserve a label (Q-number) before sending
-    const { label, promise } = enqueue(question, timeoutMs);
+    const { label, promise } = enqueue(question, timeoutMs, to);
 
     // Step 2: Build the full WhatsApp message
     //   Line 1: label (helps user track concurrent questions)
@@ -110,4 +111,3 @@ export async function handleAskQuestion(args: Record<string, unknown>) {
         };
     }
 }
-

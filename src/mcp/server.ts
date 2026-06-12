@@ -8,50 +8,36 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { registerTools } from './tools/registry.js';
+import { registerPrompts } from './prompts.js';
 import { setUnsolicitedMessageHandler } from '../whatsapp/client.js';
 
 export async function createAndStartServer(): Promise<void> {
     const server = new Server(
-        { name: 'whatsapp-mcp', version: '2.0.1' },
-        { capabilities: { tools: {}, prompts: {} } }, // Added prompts to avoid capability errors if AI tests it
+        { name: 'whatsapp-mcp', version: '2.0.2' },
+        {
+            capabilities: {
+                tools: {},
+                prompts: {
+                    listChanged: false,
+                },
+            },
+            instructions:
+                'Use WhatsApp as the primary human-in-the-loop channel for this server. ' +
+                'If any WhatsApp tool returns a QR image, show it to the user and retry the original tool after the QR is scanned. ' +
+                'Prefer ask_question for confirmations and send_message for one-way updates. ' +
+                'Normal tool usage may trigger authentication automatically when needed.',
+        },
     );
 
     registerTools(server);
+    registerPrompts(server);
 
-    setUnsolicitedMessageHandler(async (text, sender) => {
-        try {
-            console.error(`[MCP] Received unsolicited WhatsApp message from ${sender}. Sending sampling request to AI Agent...`);
-
-            // Backup: Send a notification to the client just in case sampling isn't fully supported
-            server.notification({
-                method: 'notifications/message',
-                params: {
-                    sender: sender,
-                    text: text
-                }
-            });
-
-            // We use MCP's createMessage (Sampling SDK) to push the message directly to the AI Agent.
-            await server.createMessage({
-                messages: [
-                    {
-                        role: "user",
-                        content: {
-                            type: "text",
-                            text: `[Incoming WhatsApp Message from ${sender}]:\n"${text}"\n\nPlease process this message. If a reply is necessary, use the 'send_message' or 'ask_question' tool to respond to the user on WhatsApp.`
-                        }
-                    }
-                ],
-                maxTokens: 1000
-            });
-            console.error('[MCP] Successfully sampled response from AI Agent.');
-        } catch (error) {
-            console.error('[MCP] Failed to send sampled message to AI agent. It either does not support sampling or is busy:', error);
-        }
+    setUnsolicitedMessageHandler((text, sender) => {
+        console.error(`[MCP] Queued unsolicited WhatsApp message from ${sender}. Use get_incoming_messages to retrieve it.`);
     });
 
     const transport = new StdioServerTransport();
     await server.connect(transport);
 
-    console.error('[MCP] Server v2.0.1 running on stdio transport.');
+    console.error('[MCP] Server v2.0.2 running on stdio transport.');
 }
