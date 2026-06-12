@@ -1,5 +1,4 @@
-import { connect } from '../../whatsapp/client.js';
-import { buildConnectToolResult } from './auth-flow.js';
+import { buildConnectToolResult, connectWithInitializationTimeout } from './auth-flow.js';
 
 export const connectTool = {
     name: 'connect',
@@ -9,7 +8,18 @@ export const connectTool = {
 
 export async function handleConnect() {
     try {
-        const result = await connect();
+        const result = await connectWithInitializationTimeout();
+        if (result === 'timeout') {
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: 'WhatsApp connection is currently initializing in the background. Please wait a few moments for the QR code to be generated or for the connection to be established. You can check progress using the `get_status` tool.',
+                    },
+                ],
+            };
+        }
+
         return await buildConnectToolResult(result);
     } catch (err: any) {
         throw new Error(`Failed to connect to WhatsApp: ${err?.message || err}`);

@@ -180,6 +180,18 @@ describe('send_message', () => {
         );
     });
 
+    test('validates message before triggering auth when disconnected', async () => {
+        __setConnectResultForTest({
+            status: 'qr',
+            qrDataUri: 'data:image/png;base64,ZmFrZS1xcg==',
+        });
+
+        await assert.rejects(
+            () => handleSendMessage({ message: '' }),
+            /message.*required/i,
+        );
+    });
+
     test('returns sent=true and a response object on success', async () => {
         const mock = makeMockSocket();
         __setConnectedForTest(true);
@@ -300,6 +312,18 @@ describe('ask_question', () => {
     test('throws when question is missing', async () => {
         __setConnectedForTest(true);
         __setSocketForTest(makeMockSocket());
+        await assert.rejects(
+            () => handleAskQuestion({ question: '' }),
+            /question.*required/i,
+        );
+    });
+
+    test('validates question before triggering auth when disconnected', async () => {
+        __setConnectResultForTest({
+            status: 'qr',
+            qrDataUri: 'data:image/png;base64,ZmFrZS1xcg==',
+        });
+
         await assert.rejects(
             () => handleAskQuestion({ question: '' }),
             /question.*required/i,

@@ -32,8 +32,36 @@ export async function createAndStartServer(): Promise<void> {
     registerTools(server);
     registerPrompts(server);
 
-    setUnsolicitedMessageHandler((text, sender) => {
-        console.error(`[MCP] Queued unsolicited WhatsApp message from ${sender}. Use get_incoming_messages to retrieve it.`);
+    setUnsolicitedMessageHandler(async (text, sender) => {
+        console.error(`[MCP] Queued unsolicited WhatsApp message from ${sender}. Attempting passive delivery to the client.`);
+
+        try {
+            server.notification({
+                method: 'notifications/message',
+                params: {
+                    sender,
+                    text,
+                },
+            });
+
+            await server.createMessage({
+                messages: [
+                    {
+                        role: 'user',
+                        content: {
+                            type: 'text',
+                            text:
+                                `[Incoming WhatsApp Message from ${sender}]:\n"${text}"\n\n` +
+                                "Please process this message. If a reply is necessary, use the 'send_message' or 'ask_question' tool to respond to the user on WhatsApp.",
+                        },
+                    },
+                ],
+                maxTokens: 1000,
+            });
+            console.error('[MCP] Successfully sampled unsolicited WhatsApp message to the client.');
+        } catch (error) {
+            console.error('[MCP] Passive unsolicited delivery failed; message remains available via get_incoming_messages:', error);
+        }
     });
 
     const transport = new StdioServerTransport();

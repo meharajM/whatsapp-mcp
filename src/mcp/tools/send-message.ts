@@ -50,16 +50,16 @@ export const sendMessageTool = {
 } as const;
 
 export async function handleSendMessage(args: Record<string, unknown>) {
+    const message = args.message as string;
+    if (!message) {
+        throw new McpError(ErrorCode.InvalidParams, '"message" is required.');
+    }
+
     if (!isConnected()) {
         const authResult = await ensureConnectedForAction('send WhatsApp messages');
         if (authResult) {
             return authResult;
         }
-    }
-
-    const message = args.message as string;
-    if (!message) {
-        throw new McpError(ErrorCode.InvalidParams, '"message" is required.');
     }
 
     const to = args.to ? normalizeNumber(args.to as string) : config.targetNumber;

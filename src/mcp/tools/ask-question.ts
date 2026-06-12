@@ -53,16 +53,16 @@ export const askQuestionTool = {
 } as const;
 
 export async function handleAskQuestion(args: Record<string, unknown>) {
+    const question = args.question as string;
+    if (!question) {
+        throw new McpError(ErrorCode.InvalidParams, '"question" is required.');
+    }
+
     if (!isConnected()) {
         const authResult = await ensureConnectedForAction('ask the user a question on WhatsApp');
         if (authResult) {
             return authResult;
         }
-    }
-
-    const question = args.question as string;
-    if (!question) {
-        throw new McpError(ErrorCode.InvalidParams, '"question" is required.');
     }
 
     const to = args.to ? normalizeNumber(args.to as string) : config.targetNumber;

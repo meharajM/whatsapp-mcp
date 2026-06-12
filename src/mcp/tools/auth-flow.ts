@@ -10,6 +10,8 @@ import {
     isConnected,
 } from '../../whatsapp/client.js';
 
+const CONNECT_INIT_TIMEOUT_MS = 3000;
+
 function buildQrHtml(dataUri: string): string {
     return `<!DOCTYPE html>
 <html>
@@ -99,12 +101,24 @@ export async function buildConnectToolResult(result: ConnectionResult): Promise<
     };
 }
 
+export async function connectWithInitializationTimeout(): Promise<ConnectionResult | 'timeout'> {
+    const timeoutPromise = new Promise<'timeout'>((resolve) => {
+        setTimeout(() => resolve('timeout'), CONNECT_INIT_TIMEOUT_MS);
+    });
+
+    return Promise.race([connect(), timeoutPromise]);
+}
+
 export async function ensureConnectedForAction(actionLabel: string): Promise<CallToolResult | null> {
     if (isConnected()) {
         return null;
     }
 
-    const result = await connect();
+    const result = await connectWithInitializationTimeout();
+    if (result === 'timeout') {
+        return buildConnectingResult(actionLabel);
+    }
+
     if (result.status === 'connected' || isConnected()) {
         return null;
     }
