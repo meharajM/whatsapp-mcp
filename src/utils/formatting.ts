@@ -51,3 +51,21 @@ export function extractHeading(question: string): string {
     const raw = (firstSentence ?? firstLine).trim();
     return raw.length > 45 ? raw.slice(0, 42) + '...' : raw;
 }
+
+/**
+ * Applies the outgoing WhatsApp formatting mode.
+ * - markdown: send the text as-is so WhatsApp renders *bold*, _italic_, etc.
+ * - plain: neutralize WhatsApp markup markers so the text stays literal.
+ */
+export function prepareOutgoingMessage(
+    message: string,
+    format: 'plain' | 'markdown' = 'plain',
+): string {
+    if (format === 'markdown') {
+        return message;
+    }
+
+    // Insert a zero-width space after formatting markers so WhatsApp does not
+    // interpret them as markup while keeping the visible text unchanged.
+    return message.replace(/([*_~`])/g, '$1\u200B');
+}

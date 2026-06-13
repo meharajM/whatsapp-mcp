@@ -19,20 +19,23 @@ import {
     __resetForTest,
 } from '../src/utils/question-queue.js';
 
+const TARGET_A = '111111111111@s.whatsapp.net';
+const TARGET_B = '222222222222@s.whatsapp.net';
+
 beforeEach(() => {
     __resetForTest();
 });
 
 describe('enqueue', () => {
     test('returns a label in [Q{n}: heading] format', () => {
-        const { label, promise } = enqueue('Deploy to production?', 60_000);
+        const { label, promise } = enqueue('Deploy to production?', 60_000, TARGET_A);
         promise.catch(() => { });
         assert.match(label, /^\[Q\d+: .+\]$/);
     });
 
     test('increments the Q-number for each enqueue', () => {
-        const { label: l1, promise: p1 } = enqueue('First question?', 60_000);
-        const { label: l2, promise: p2 } = enqueue('Second question?', 60_000);
+        const { label: l1, promise: p1 } = enqueue('First question?', 60_000, TARGET_A);
+        const { label: l2, promise: p2 } = enqueue('Second question?', 60_000, TARGET_A);
         p1.catch(() => { });
         p2.catch(() => { });
         const n1 = parseInt(l1.match(/Q(\d+)/)![1]);
@@ -41,14 +44,14 @@ describe('enqueue', () => {
     });
 
     test('heading is derived from the first sentence of the question', () => {
-        const { label, promise } = enqueue('Is it safe to proceed? More context here.', 60_000);
+        const { label, promise } = enqueue('Is it safe to proceed? More context here.', 60_000, TARGET_A);
         promise.catch(() => { });
         assert.ok(label.includes('Is it safe to proceed?'), `Label was: ${label}`);
     });
 
     test('heading is truncated if longer than 45 chars', () => {
         const longQ = 'This is an extremely long question sentence that definitely exceeds the limit';
-        const { label, promise } = enqueue(longQ, 60_000);
+        const { label, promise } = enqueue(longQ, 60_000, TARGET_A);
         promise.catch(() => { });
         // Extract just the heading part between ": " and "]"
         const heading = label.slice(label.indexOf(': ') + 2, -1);
@@ -57,7 +60,7 @@ describe('enqueue', () => {
 
     test('adds the question to the queue', () => {
         assert.equal(getQueueLength(), 0);
-        const { promise } = enqueue('Question?', 60_000);
+        const { promise } = enqueue('Question?', 60_000, TARGET_A);
         promise.catch(() => { });
         assert.equal(getQueueLength(), 1);
     });
@@ -65,21 +68,21 @@ describe('enqueue', () => {
 
 describe('resolveNext', () => {
     test('resolves the promise with the reply text', async () => {
-        const { promise } = enqueue('Are you sure?', 60_000);
+        const { promise } = enqueue('Are you sure?', 60_000, TARGET_A);
         resolveNext('yes');
         const reply = await promise;
         assert.equal(reply, 'yes');
     });
 
     test('removes the item from the queue after resolving', async () => {
-        const { promise } = enqueue('Question?', 60_000);
+        const { promise } = enqueue('Question?', 60_000, TARGET_A);
         resolveNext('answer');
         await promise;
         assert.equal(getQueueLength(), 0);
     });
 
     test('returns true when a question was resolved', () => {
-        const { promise } = enqueue('Question?', 60_000);
+        const { promise } = enqueue('Question?', 60_000, TARGET_A);
         promise.catch(() => { });
         assert.equal(resolveNext('reply'), true);
     });
@@ -89,8 +92,8 @@ describe('resolveNext', () => {
     });
 
     test('operates FIFO — resolves earliest question first', async () => {
-        const { promise: p1 } = enqueue('First?', 60_000);
-        const { promise: p2 } = enqueue('Second?', 60_000);
+        const { promise: p1 } = enqueue('First?', 60_000, TARGET_A);
+        const { promise: p2 } = enqueue('Second?', 60_000, TARGET_A);
 
         resolveNext('reply-to-first');
         resolveNext('reply-to-second');
@@ -103,9 +106,9 @@ describe('resolveNext', () => {
 
 describe('concurrent questions', () => {
     test('supports multiple simultaneous questions with distinct labels', () => {
-        const { label: l1, promise: p1 } = enqueue('Delete logs?', 60_000);
-        const { label: l2, promise: p2 } = enqueue('Deploy to staging?', 60_000);
-        const { label: l3, promise: p3 } = enqueue('What region?', 60_000);
+        const { label: l1, promise: p1 } = enqueue('Delete logs?', 60_000, TARGET_A);
+        const { label: l2, promise: p2 } = enqueue('Deploy to staging?', 60_000, TARGET_A);
+        const { label: l3, promise: p3 } = enqueue('What region?', 60_000, TARGET_A);
 
         p1.catch(() => { });
         p2.catch(() => { });
@@ -117,8 +120,8 @@ describe('concurrent questions', () => {
     });
 
     test('getPendingLabels returns all present labels in order', () => {
-        const { label: l1, promise: p1 } = enqueue('A?', 60_000);
-        const { label: l2, promise: p2 } = enqueue('B?', 60_000);
+        const { label: l1, promise: p1 } = enqueue('A?', 60_000, TARGET_A);
+        const { label: l2, promise: p2 } = enqueue('B?', 60_000, TARGET_A);
 
         p1.catch(() => { });
         p2.catch(() => { });
@@ -130,7 +133,7 @@ describe('concurrent questions', () => {
 
 describe('timeout', () => {
     test('rejects the promise when timeout elapses', async () => {
-        const { promise } = enqueue('Will I time out?', 50); // 50ms timeout
+        const { promise } = enqueue('Will I time out?', 50, TARGET_A); // 50ms timeout
 
         await assert.rejects(promise, (err: Error) => {
             assert.ok(err.message.includes('Timeout'), `Expected timeout message, got: ${err.message}`);
@@ -139,10 +142,38 @@ describe('timeout', () => {
     });
 
     test('removes the item from the queue after timeout', async () => {
-        const { promise } = enqueue('Timing out?', 50);
+        const { promise } = enqueue('Timing out?', 50, TARGET_A);
 
         try { await promise; } catch { /* expected */ }
 
         assert.equal(getQueueLength(), 0);
+    });
+});
+
+describe('targeted routing', () => {
+    test('routes replies to the matching target JID instead of global FIFO', async () => {
+        const { promise: first } = enqueue('First target?', 60_000, TARGET_A);
+        const { promise: second } = enqueue('Second target?', 60_000, TARGET_B);
+
+        assert.equal(resolveNext('reply for B', TARGET_B), true);
+        assert.equal(await second, 'reply for B');
+        assert.equal(getQueueLength(), 1);
+
+        assert.equal(resolveNext('reply for A', TARGET_A), true);
+        assert.equal(await first, 'reply for A');
+        assert.equal(getQueueLength(), 0);
+    });
+
+    test('ignores late replies for timed-out questions instead of misrouting them', async () => {
+        const { promise: first } = enqueue('Will expire?', 30, TARGET_A);
+        const { promise: second } = enqueue('Still waiting?', 60_000, TARGET_A);
+
+        await assert.rejects(first, /Timeout/);
+
+        assert.equal(resolveNext('late reply', TARGET_A), false);
+        assert.equal(getQueueLength(), 1);
+
+        assert.equal(resolveNext('fresh reply', TARGET_A), true);
+        assert.equal(await second, 'fresh reply');
     });
 });
