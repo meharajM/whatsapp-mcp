@@ -11,8 +11,9 @@
 
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { getSocket, isConnected, waitForDelivery } from '../../whatsapp/client.js';
-import { normalizeNumber } from '../../utils/formatting.js';
+import { normalizeNumber, prepareOutgoingMessage } from '../../utils/formatting.js';
 import { config } from '../../config.js';
+import { ensureConnectedForAction } from './auth-flow.js';
 
 export const sendMessageTool = {
     name: 'send_message',
@@ -49,20 +50,21 @@ export const sendMessageTool = {
 } as const;
 
 export async function handleSendMessage(args: Record<string, unknown>) {
-    if (!isConnected()) {
-        throw new McpError(
-            ErrorCode.InternalError,
-            'WhatsApp is not connected. Check server logs for QR code or reconnection status. ' +
-            'You can use get_status to verify connection state.',
-        );
-    }
-
     const message = args.message as string;
     if (!message) {
         throw new McpError(ErrorCode.InvalidParams, '"message" is required.');
     }
 
+    if (!isConnected()) {
+        const authResult = await ensureConnectedForAction('send WhatsApp messages');
+        if (authResult) {
+            return authResult;
+        }
+    }
+
     const to = args.to ? normalizeNumber(args.to as string) : config.targetNumber;
+    const format = args.format === 'markdown' ? 'markdown' : 'plain';
+    const outboundText = prepareOutgoingMessage(message, format);
 
     const sock = getSocket()!;
     let sent = false;
@@ -70,7 +72,7 @@ export async function handleSendMessage(args: Record<string, unknown>) {
     let messageId: string | undefined;
 
     try {
-        const result = await sock.sendMessage(to, { text: message });
+        const result = await sock.sendMessage(to, { text: outboundText });
         messageId = result?.key?.id;
         sent = true;
         console.error(`[Tool:send_message] Sent to ${to}. MessageId: ${messageId}`);
@@ -99,4 +101,3 @@ export async function handleSendMessage(args: Record<string, unknown>) {
         ],
     };
 }
-

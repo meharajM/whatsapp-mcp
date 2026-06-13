@@ -87,10 +87,11 @@ Add this to your MCP configuration file:
 
 The very first time you use the MCP server, it needs to authenticate with WhatsApp Web:
 
-1. Call the **`connect`** tool via your Agent.
-2. The agent will return a QR code image inline in the UI. 
-3. Open WhatsApp on your phone -> Linked Devices -> Link a Device, and scan the QR.
-4. The authentication session is saved to your home directory (`~/.whatsapp-mcp/baileys_auth_info`), so you don't need to scan it again across restarts.
+1. Call the **`connect`** tool via your Agent, or just use any WhatsApp tool normally. If the session is not authenticated yet, the server will trigger authentication automatically.
+2. The tool result will return the QR code image directly in MCP content so modern clients can render it inline.
+3. If your client does not render inline images, the server also tries to write a local fallback HTML page under `~/.whatsapp-mcp/qr.html`.
+4. Open WhatsApp on your phone -> Linked Devices -> Link a Device, and scan the QR.
+5. The authentication session is saved to your home directory (`~/.whatsapp-mcp/baileys_auth_info`), so you don't need to scan it again across restarts.
 
 ### Remote "Auto-Pilot" Workflow (Skip IDE Prompts)
 
@@ -110,11 +111,13 @@ With these two steps, the AI will proactively proactively use the `ask_question`
 
 ## Features & Tools
 
-- **`connect`**: Connects to the WhatsApp network. If not logged in, generates a QR code image base64 directly into the MCP client UI for easy scanning.
+- **`connect`**: Connects to the WhatsApp network. If not logged in, returns a native QR image in the tool result and may also provide a local HTML fallback.
 - **`disconnect`**: Completely logs out of WhatsApp and invalidates the session credentials.
-- **`send_message`**: Sends a one-way notification. Supports optional WhatsApp markdown mapping (`*bold*`).
-- **`ask_question`**: Sends a prompt and blocks execution until a reply is received (with a timeout). Concurrent questions are smartly queued and tagged with references.
-- **`get_status`**: Provides agent connection state monitoring.
+- **`send_message`**: Sends a one-way notification. Supports optional WhatsApp markdown mapping (`*bold*`). If the server is not connected yet, it auto-triggers authentication first.
+- **`ask_question`**: Sends a prompt and blocks execution until a reply is received (with a timeout). Concurrent questions are smartly queued and tagged with references. If the server is not connected yet, it auto-triggers authentication first.
+- **`get_incoming_messages`**: Polls unsolicited inbound WhatsApp messages so agents that do not support server-side sampling can still retrieve them.
+- **`get_status`**: Provides agent connection state monitoring, including auth state such as `connected`, `connecting`, or `qr_pending`.
+- **Server instructions + prompt**: The server exports built-in workflow instructions and a `whatsapp-autopilot` prompt so clients can guide agents toward connect-first and WhatsApp-first behavior.
 
 ## Local Development
 
@@ -147,7 +150,7 @@ This project utilizes the following open-source libraries:
 - Cursor WhatsApp integration
 - Claude WhatsApp integration
 - Autonomous agents
-- - Cursor power users
+- Cursor power users
 - Remote workers
 
 

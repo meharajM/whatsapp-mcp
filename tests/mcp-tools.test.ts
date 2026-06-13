@@ -13,14 +13,18 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    __setConnectResultForTest,
     __setConnectedForTest,
     __setSocketForTest,
     waitForDelivery,
 } from '../src/whatsapp/client.js';
 import { __resetForTest } from '../src/utils/question-queue.js';
+import { __resetForTest as __resetInboxForTest } from '../src/utils/inbox-queue.js';
 import { handleGetStatus } from '../src/mcp/tools/get-status.js';
 import { handleSendMessage } from '../src/mcp/tools/send-message.js';
 import { handleAskQuestion } from '../src/mcp/tools/ask-question.js';
+import { handleGetIncomingMessages } from '../src/mcp/tools/get-incoming-messages.js';
+import { handleConnect } from '../src/mcp/tools/connect.js';
 
 // ── Mock socket factory ───────────────────────────────────────────────────────
 
@@ -46,8 +50,10 @@ function makeMockSocket(opts: {
 
 beforeEach(() => {
     __resetForTest();
+    __resetInboxForTest();
     __setConnectedForTest(false);
     __setSocketForTest(null);
+    __setConnectResultForTest(null);
 });
 
 // ── get_status ────────────────────────────────────────────────────────────────
@@ -57,8 +63,10 @@ describe('get_status', () => {
         const result = await handleGetStatus();
         const data = JSON.parse(result.content[0].text);
         assert.equal(data.connected, false);
+        assert.equal(data.authState, 'disconnected');
         assert.equal(data.pendingQuestions, 0);
         assert.deepEqual(data.pendingLabels, []);
+        assert.equal(data.pendingIncomingMessages, 0);
     });
 
     test('returns connected=true when connected', async () => {
@@ -67,6 +75,7 @@ describe('get_status', () => {
         const result = await handleGetStatus();
         const data = JSON.parse(result.content[0].text);
         assert.equal(data.connected, true);
+        assert.equal(data.pendingIncomingMessages, 0);
     });
 
     test('returns pending question count when questions are queued', async () => {
@@ -84,6 +93,7 @@ describe('get_status', () => {
         assert.equal(data.pendingQuestions, 1);
         assert.equal(data.pendingLabels.length, 1);
         assert.match(data.pendingLabels[0], /\[Q\d+:/);
+        assert.equal(data.pendingIncomingMessages, 0);
 
         // Clean up
         const { resolveNext } = await import('../src/utils/question-queue.js');
@@ -92,19 +102,90 @@ describe('get_status', () => {
     });
 });
 
+describe('get_incoming_messages', () => {
+    test('auto-triggers connect and returns QR guidance when authentication is required', async () => {
+        __setConnectResultForTest({
+            status: 'qr',
+            qrDataUri: 'data:image/png;base64,ZmFrZS1xcg==',
+        });
+
+        const result = await handleGetIncomingMessages({});
+        assert.equal(result.content[0].type, 'text');
+        assert.match(result.content[0].text, /authentication is required/i);
+        assert.equal(result.content[1].type, 'image');
+    });
+
+    test('returns unsolicited messages and drains the inbox', async () => {
+        __setConnectedForTest(true);
+        __setSocketForTest(makeMockSocket());
+
+        const { __messageUpsertHandlerForTest } = await import('../src/whatsapp/client.js');
+        await __messageUpsertHandlerForTest({
+            type: 'notify',
+            messages: [
+                {
+                    key: {
+                        remoteJid: '1234567890@s.whatsapp.net',
+                        fromMe: false,
+                    },
+                    message: {
+                        conversation: 'hello from phone',
+                    },
+                },
+            ],
+        });
+
+        const first = await handleGetIncomingMessages({});
+        const firstData = JSON.parse(first.content[0].text);
+        assert.equal(firstData.count, 1);
+        assert.equal(firstData.messages[0].text, 'hello from phone');
+
+        const second = await handleGetIncomingMessages({});
+        const secondData = JSON.parse(second.content[0].text);
+        assert.equal(secondData.count, 0);
+    });
+});
+
 // ── send_message ──────────────────────────────────────────────────────────────
 
 describe('send_message', () => {
-    test('throws when WhatsApp is not connected', async () => {
-        await assert.rejects(
-            () => handleSendMessage({ message: 'Hello' }),
-            /not connected/i,
-        );
+    test('auto-triggers connect and returns QR guidance when authentication is required', async () => {
+        __setConnectResultForTest({
+            status: 'qr',
+            qrDataUri: 'data:image/png;base64,ZmFrZS1xcg==',
+        });
+
+        const result = await handleSendMessage({ message: 'Hello' });
+        assert.equal(result.content[0].type, 'text');
+        assert.match(result.content[0].text, /attached QR image/i);
+        assert.equal(result.content[1].type, 'image');
+    });
+
+    test('auto-triggers connect and proceeds when a session is restored', async () => {
+        const mock = makeMockSocket();
+        __setSocketForTest(mock);
+        __setConnectResultForTest({ status: 'connected' });
+
+        const result = await handleSendMessage({ message: 'Hello' });
+        const data = JSON.parse(result.content[0].text);
+        assert.equal(data.sent, true);
     });
 
     test('throws when message is missing', async () => {
         __setConnectedForTest(true);
         __setSocketForTest(makeMockSocket());
+        await assert.rejects(
+            () => handleSendMessage({ message: '' }),
+            /message.*required/i,
+        );
+    });
+
+    test('validates message before triggering auth when disconnected', async () => {
+        __setConnectResultForTest({
+            status: 'qr',
+            qrDataUri: 'data:image/png;base64,ZmFrZS1xcg==',
+        });
+
         await assert.rejects(
             () => handleSendMessage({ message: '' }),
             /message.*required/i,
@@ -130,6 +211,25 @@ describe('send_message', () => {
         await handleSendMessage({ message: 'Hello from agent' });
         assert.equal(mock.sentMessages.length, 1);
         assert.equal(mock.sentMessages[0].content.text, 'Hello from agent');
+    });
+
+    test('respects plain format by neutralizing markdown markers', async () => {
+        const mock = makeMockSocket();
+        __setConnectedForTest(true);
+        __setSocketForTest(mock);
+
+        await handleSendMessage({ message: '*bold* _italic_', format: 'plain' });
+        assert.equal(mock.sentMessages[0].content.text.includes('\u200B'), true);
+        assert.notEqual(mock.sentMessages[0].content.text, '*bold* _italic_');
+    });
+
+    test('passes markdown format through unchanged', async () => {
+        const mock = makeMockSocket();
+        __setConnectedForTest(true);
+        __setSocketForTest(mock);
+
+        await handleSendMessage({ message: '*bold* _italic_', format: 'markdown' });
+        assert.equal(mock.sentMessages[0].content.text, '*bold* _italic_');
     });
 
     test('uses custom `to` number when provided', async () => {
@@ -183,16 +283,47 @@ describe('send_message', () => {
 // ── ask_question ──────────────────────────────────────────────────────────────
 
 describe('ask_question', () => {
-    test('throws when WhatsApp is not connected', async () => {
-        await assert.rejects(
-            () => handleAskQuestion({ question: 'Hello?' }),
-            /not connected/i,
-        );
+    test('auto-triggers connect and returns QR guidance when authentication is required', async () => {
+        __setConnectResultForTest({
+            status: 'qr',
+            qrDataUri: 'data:image/png;base64,ZmFrZS1xcg==',
+        });
+
+        const result = await handleAskQuestion({ question: 'Hello?' });
+        assert.equal(result.content[0].type, 'text');
+        assert.match(result.content[0].text, /attached QR image/i);
+        assert.equal(result.content[1].type, 'image');
+    });
+
+    test('auto-triggers connect and proceeds when a session is restored', async () => {
+        const mock = makeMockSocket();
+        __setSocketForTest(mock);
+        __setConnectResultForTest({ status: 'connected' });
+
+        const { resolveNext } = await import('../src/utils/question-queue.js');
+        const questionPromise = handleAskQuestion({ question: 'Hello?' });
+        await new Promise((resolve) => setImmediate(resolve));
+        resolveNext('yes');
+
+        const result = await questionPromise;
+        assert.match(result.content[0].text, /yes/);
     });
 
     test('throws when question is missing', async () => {
         __setConnectedForTest(true);
         __setSocketForTest(makeMockSocket());
+        await assert.rejects(
+            () => handleAskQuestion({ question: '' }),
+            /question.*required/i,
+        );
+    });
+
+    test('validates question before triggering auth when disconnected', async () => {
+        __setConnectResultForTest({
+            status: 'qr',
+            qrDataUri: 'data:image/png;base64,ZmFrZS1xcg==',
+        });
+
         await assert.rejects(
             () => handleAskQuestion({ question: '' }),
             /question.*required/i,
@@ -286,7 +417,7 @@ describe('ask_question', () => {
             question: 'Are you sure?',
             to: '+44 7700 900123',
         });
-        resolveNext('yes');
+        resolveNext('yes', '447700900123@s.whatsapp.net');
         await questionPromise;
 
         assert.equal(mock.sentMessages[0].to, '447700900123@s.whatsapp.net');
@@ -305,5 +436,20 @@ describe('ask_question', () => {
 
         assert.equal(result.isError, true);
         assert.ok(result.content[0].text.includes('Timeout'));
+    });
+});
+
+describe('connect', () => {
+    test('returns native QR image content with text guidance when authentication is required', async () => {
+        __setConnectResultForTest({
+            status: 'qr',
+            qrDataUri: 'data:image/png;base64,ZmFrZS1xcg==',
+        });
+
+        const result = await handleConnect();
+        assert.equal(result.content[0].type, 'text');
+        assert.match(result.content[0].text, /scan/i);
+        assert.equal(result.content[1].type, 'image');
+        assert.equal((result.content[1] as any).mimeType, 'image/png');
     });
 });

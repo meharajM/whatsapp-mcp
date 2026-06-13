@@ -7,9 +7,11 @@
  * verify the server is ready before sending messages (Gap 6).
  */
 
-import { isConnected, isConnecting } from '../../whatsapp/client.js';
+import { getAuthState, isConnected, isConnecting } from '../../whatsapp/client.js';
 import { config } from '../../config.js';
 import { getQueueLength, getPendingLabels } from '../../utils/question-queue.js';
+import { getIncomingMessageCount, getIncomingMessageSummaries } from '../../utils/inbox-queue.js';
+import { getAuthStatusMessage } from './auth-flow.js';
 
 export const getStatusTool = {
     name: 'get_status',
@@ -27,17 +29,12 @@ export const getStatusTool = {
 export async function handleGetStatus() {
     const connected = isConnected();
     const connecting = isConnecting();
+    const authState = getAuthState();
     const pendingCount = getQueueLength();
     const pendingLabels = getPendingLabels();
-
-    let statusMessage = '';
-    if (connected) {
-        statusMessage = 'WhatsApp is connected successfully and ready to use.';
-    } else if (connecting) {
-        statusMessage = 'WhatsApp is currently attempting to connect in the background. Check server logs for QR code or scan manually.';
-    } else {
-        statusMessage = 'WhatsApp is NOT connected. Check server logs for QR code or reconnection status.';
-    }
+    const incomingCount = getIncomingMessageCount();
+    const incomingSummaries = getIncomingMessageSummaries();
+    const statusMessage = getAuthStatusMessage();
 
     return {
         content: [
@@ -47,9 +44,12 @@ export async function handleGetStatus() {
                     {
                         connected,
                         connecting,
+                        authState,
                         targetNumber: config.targetNumber,
                         pendingQuestions: pendingCount,
                         pendingLabels,
+                        pendingIncomingMessages: incomingCount,
+                        pendingIncomingSummaries: incomingSummaries,
                         status: statusMessage,
                     },
                     null,
