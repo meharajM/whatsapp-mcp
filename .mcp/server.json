@@ -1,0 +1,44 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.meharajM/whatsapp-mcp",
+  "description": "WhatsApp MCP Server - Human-in-the-loop for AI agents via WhatsApp",
+  "title": "WhatsApp MCP Server",
+  "websiteUrl": "https://github.com/meharajM/whatsapp-mcp",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/meharajM/whatsapp-mcp/main/assets/logo.png",
+      "mimeType": "image/png"
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/meharajM/whatsapp-mcp",
+    "source": "github"
+  },
+  "version": "2.0.3",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@mhrj/whatsapp-mcp",
+      "version": "2.0.3",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "description": "Target WhatsApp number (required)",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false,
+          "name": "WHATSAPP_TARGET_NUMBER"
+        },
+        {
+          "description": "Comma-separated JIDs to restrict who can control replies",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "WHATSAPP_ALLOWED_NUMBERS"
+        }
+      ]
+    }
+  ]
+}

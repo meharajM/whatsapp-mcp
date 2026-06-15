@@ -1,7 +1,9 @@
 import * as dotenv from 'dotenv';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { homedir } from 'os';
-import { mkdirSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
+import { normalizeNumber } from './utils/formatting.js';
 
 const mcpDir = join(homedir(), '.whatsapp-mcp');
 try {
@@ -10,18 +12,19 @@ try {
     // Ignore folder creation errors
 }
 
-// Support loading `.env` from ~/.whatsapp-mcp/.env 
-const _originalLog = console.log;
-const _originalInfo = console.info;
-console.log = console.error;
-console.info = console.error;
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(moduleDir, '..');
 
-dotenv.config({ path: join(mcpDir, '.env') });
-// Also fallback to the current working directory `.env` or MCP injected environments
-dotenv.config();
+function loadEnvFile(path: string): void {
+    if (existsSync(path)) {
+        dotenv.config({ path, quiet: true });
+    }
+}
 
-console.log = _originalLog;
-console.info = _originalInfo;
+// Support loading ~/.whatsapp-mcp/.env, the repo root .env, and the current working directory .env.
+loadEnvFile(join(mcpDir, '.env'));
+loadEnvFile(join(repoRoot, '.env'));
+loadEnvFile(join(process.cwd(), '.env'));
 
 function requireEnv(key: string): string {
     const val = process.env[key];
@@ -34,9 +37,7 @@ function requireEnv(key: string): string {
 }
 
 function normalizeWhatsappId(number: string): string {
-    // Strip + signs and spaces, then ensure @s.whatsapp.net suffix
-    const clean = number.replace(/[+\s]/g, '');
-    return clean.endsWith('@s.whatsapp.net') ? clean : `${clean}@s.whatsapp.net`;
+    return normalizeNumber(number);
 }
 
 const rawTargetNumber = requireEnv('WHATSAPP_TARGET_NUMBER');
