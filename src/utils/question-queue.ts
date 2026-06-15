@@ -12,6 +12,8 @@ import { extractHeading } from './formatting.js';
 export type QueuedQuestion = {
     id: number;
     label: string;
+    targetJid: string;
+    expired: boolean;
     resolve: (reply: string) => void;
     reject: (err: Error) => void;
     timeoutHandle: ReturnType<typeof setTimeout>;
@@ -31,6 +33,7 @@ const queue: QueuedQuestion[] = [];
 export function enqueue(
     question: string,
     timeoutMs: number,
+    targetJid: string,
 ): { label: string; promise: Promise<string> } {
     questionCounter += 1;
     const id = questionCounter;
@@ -40,11 +43,13 @@ export function enqueue(
     const promise = new Promise<string>((resolve, reject) => {
         const timeoutHandle = setTimeout(() => {
             const idx = queue.findIndex((q) => q.id === id);
-            if (idx !== -1) queue.splice(idx, 1);
+            if (idx !== -1) {
+                queue[idx].expired = true;
+            }
             reject(new Error(`Timeout: no reply received for ${label}`));
         }, timeoutMs);
 
-        queue.push({ id, label, resolve, reject, timeoutHandle });
+        queue.push({ id, label, targetJid, expired: false, resolve, reject, timeoutHandle });
     });
 
     return { label, promise };
@@ -55,22 +60,53 @@ export function enqueue(
  * Dequeues the oldest pending question and resolves it with the reply.
  * Returns true if a pending question was resolved, false if the queue was empty.
  */
-export function resolveNext(reply: string): boolean {
-    const item = queue.shift();
-    if (!item) return false;
-    clearTimeout(item.timeoutHandle);
-    item.resolve(reply);
-    return true;
+export function routeIncomingReply(
+    reply: string,
+    remoteJid?: string,
+): 'resolved' | 'expired' | 'no_match' {
+    if (remoteJid) {
+        const idx = queue.findIndex((q) => q.targetJid === remoteJid);
+        if (idx === -1) return 'no_match';
+
+        const item = queue[idx];
+        queue.splice(idx, 1);
+        clearTimeout(item.timeoutHandle);
+
+        if (item.expired) {
+            return 'expired';
+        }
+
+        item.resolve(reply);
+        return 'resolved';
+    }
+
+    while (queue.length > 0) {
+        const item = queue.shift();
+        if (!item) return 'no_match';
+        clearTimeout(item.timeoutHandle);
+        if (item.expired) {
+            continue;
+        }
+
+        item.resolve(reply);
+        return 'resolved';
+    }
+
+    return 'no_match';
+}
+
+export function resolveNext(reply: string, remoteJid?: string): boolean {
+    return routeIncomingReply(reply, remoteJid) === 'resolved';
 }
 
 /** Returns the number of questions currently waiting for a reply */
 export function getQueueLength(): number {
-    return queue.length;
+    return queue.filter((q) => !q.expired).length;
 }
 
 /** Returns the labels of all questions currently in the queue */
 export function getPendingLabels(): string[] {
-    return queue.map((q) => q.label);
+    return queue.filter((q) => !q.expired).map((q) => q.label);
 }
 
 /** Reset queue counter and entries — only for use in tests */

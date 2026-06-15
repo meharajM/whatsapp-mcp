@@ -5,12 +5,18 @@ import {
     setUnsolicitedMessageHandler,
 } from '../src/whatsapp/client.js';
 import { enqueue, __resetForTest } from '../src/utils/question-queue.js';
+import {
+    __resetForTest as __resetInboxForTest,
+    drainIncomingMessages,
+    getIncomingMessageCount,
+} from '../src/utils/inbox-queue.js';
 import { config } from '../src/config.js';
 
 let unsolicitedCalls: Array<{ text: string; sender: string }> = [];
 
 beforeEach(() => {
     __resetForTest();
+    __resetInboxForTest();
     unsolicitedCalls = [];
     setUnsolicitedMessageHandler((text, sender) => {
         unsolicitedCalls.push({ text, sender });
@@ -63,17 +69,24 @@ describe('unsolicited message handler', () => {
         assert.equal(unsolicitedCalls.length, 1);
         assert.equal(unsolicitedCalls[0].text, 'user randomly talking');
         assert.equal(unsolicitedCalls[0].sender, config.targetNumber);
+        assert.equal(getIncomingMessageCount(), 1);
+
+        const [message] = drainIncomingMessages();
+        assert.equal(message.sender, config.targetNumber);
+        assert.equal(message.text, 'user randomly talking');
+        assert.equal(getIncomingMessageCount(), 0);
     });
 
     test('DOES NOT call unsolicitedMessageHandler when there IS a pending question', async () => {
         // Enqueue a question
-        const { promise } = enqueue('Are you sure?', 10000);
+        const { promise } = enqueue('Are you sure?', 10000, config.targetNumber);
 
         // Push message, triggering resolveNext
         await __messageUpsertHandlerForTest(makeMessage({ text: 'yes' }));
 
         // Assert unsolicited handler was not hit
         assert.equal(unsolicitedCalls.length, 0);
+        assert.equal(getIncomingMessageCount(), 0);
 
         // Assert promise resolved (clean up)
         const result = await promise;

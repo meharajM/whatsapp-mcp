@@ -16,6 +16,7 @@ import {
 import { sendMessageTool, handleSendMessage } from './send-message.js';
 import { askQuestionTool, handleAskQuestion } from './ask-question.js';
 import { getStatusTool, handleGetStatus } from './get-status.js';
+import { getIncomingMessagesTool, handleGetIncomingMessages } from './get-incoming-messages.js';
 import { connectTool, handleConnect } from './connect.js';
 import { disconnectTool, handleDisconnect } from './disconnect.js';
 
@@ -25,6 +26,7 @@ export const ALL_TOOLS = [
     sendMessageTool,
     askQuestionTool,
     getStatusTool,
+    getIncomingMessagesTool,
 ];
 
 export function registerTools(server: Server): void {
@@ -44,6 +46,8 @@ export function registerTools(server: Server): void {
                 return await handleAskQuestion(args);
             case 'get_status':
                 return await handleGetStatus();
+            case 'get_incoming_messages':
+                return await handleGetIncomingMessages(args as Record<string, unknown>);
             case 'connect':
                 return await handleConnect();
             case 'disconnect':
